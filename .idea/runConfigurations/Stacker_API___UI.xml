@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Stacker API + UI" type="CompoundRunConfigurationType" startOneByOne="true">
+    <toRun name="Stacker API" type="js.build_tools.npm" />
+    <toRun name="Stacker UI" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>

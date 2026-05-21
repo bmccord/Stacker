@@ -1,0 +1,211 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_dev:
+        description: 'Skip dev deployment'
+        type: boolean
+        default: false
+      skip_test:
+        description: 'Skip test deployment'
+        type: boolean
+        default: false
+      skip_prod:
+        description: 'Skip prod deployment'
+        type: boolean
+        default: false
+      major_api:
+        description: 'Major version bump for API'
+        type: boolean
+        default: false
+      major_ui:
+        description: 'Major version bump for UI'
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ── Detect what changed ──────────────────────────────────────────────
+  changes:
+    name: Detect Changes
+    runs-on: self-hosted
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      ui: ${{ steps.filter.outputs.ui }}
+      cli: ${{ steps.filter.outputs.cli }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check changed paths
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            echo "ui=true" >> "$GITHUB_OUTPUT"
+            echo "cli=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          else
+            PREV=${{ github.event.before }}
+            API=$(git diff --name-only $PREV HEAD -- 'stacker-api/' | head -1)
+            UI=$(git diff --name-only $PREV HEAD -- 'stacker-ui/' | head -1)
+            CLI=$(git diff --name-only $PREV HEAD -- 'stacker-cli/' | head -1)
+            DOCS=$(git diff --name-only $PREV HEAD -- 'stacker-docs/' | head -1)
+            echo "api=$( [ -n "$API" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+            echo "ui=$( [ -n "$UI" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+            echo "cli=$( [ -n "$CLI" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+            echo "docs=$( [ -n "$DOCS" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Version tags ─────────────────────────────────────────────────────
+  version:
+    name: Compute Versions
+    needs: changes
+    runs-on: self-hosted
+    outputs:
+      api_version: ${{ steps.ver.outputs.api_version }}
+      ui_version: ${{ steps.ver.outputs.ui_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Compute service versions
+        id: ver
+        run: |
+          compute_version() {
+            local prefix="$1"
+            local is_major="$2"
+            local latest=$(git tag -l "${prefix}/v*" --sort=-v:refname | head -1)
+            if [ -z "$latest" ]; then
+              echo "${prefix}/v1.0.0"
+              return
+            fi
+            local ver=${latest#${prefix}/v}
+            IFS='.' read -r major minor patch <<< "$ver"
+            local commit_msg="${{ github.event.head_commit.message }}"
+            if [ "$is_major" = "true" ] || echo "$commit_msg" | grep -qE "\[(major|breaking):${prefix#*/}\]|\[(major|breaking)\]"; then
+              echo "${prefix}/v$((major + 1)).0.0"
+            else
+              echo "${prefix}/v${major}.$((minor + 1)).0"
+            fi
+          }
+
+          if [ "${{ needs.changes.outputs.api }}" = "true" ]; then
+            API_VER=$(compute_version "api" "${{ inputs.major_api }}")
+            echo "api_version=${API_VER#api/v}" >> "$GITHUB_OUTPUT"
+            git tag "$API_VER"
+          fi
+
+          if [ "${{ needs.changes.outputs.ui }}" = "true" ]; then
+            UI_VER=$(compute_version "ui" "${{ inputs.major_ui }}")
+            echo "ui_version=${UI_VER#ui/v}" >> "$GITHUB_OUTPUT"
+            git tag "$UI_VER"
+          fi
+
+          git push --tags || true
+
+  # ── Build API ────────────────────────────────────────────────────────
+  build-api:
+    name: Build API Image
+    needs: [changes, version]
+    if: needs.changes.outputs.api == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ github.repository }}/stacker-api
+          VERSION=${{ needs.version.outputs.api_version }}
+          docker build -t $IMAGE:$VERSION -t $IMAGE:latest stacker-api/
+          docker push $IMAGE:$VERSION
+          docker push $IMAGE:latest
+
+  # ── Build UI ─────────────────────────────────────────────────────────
+  build-ui:
+    name: Build UI Image
+    needs: [changes, version]
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ github.repository }}/stacker-ui
+          VERSION=${{ needs.version.outputs.ui_version }}
+          docker build -t $IMAGE:$VERSION -t $IMAGE:latest stacker-ui/
+          docker push $IMAGE:$VERSION
+          docker push $IMAGE:latest
+
+  # ── Deploy Dev ───────────────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [changes, version, build-api, build-ui]
+    if: always() && !inputs.skip_dev && (needs.build-api.result == 'success' || needs.build-api.result == 'skipped') && (needs.build-ui.result == 'success' || needs.build-ui.result == 'skipped')
+    runs-on: self-hosted
+    environment: dev
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy via SSH
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'DEPLOY'
+            cd ${{ vars.DEPLOY_PATH }}
+            docker compose pull
+            docker compose up -d --remove-orphans
+          DEPLOY
+
+  # ── Deploy Test ──────────────────────────────────────────────────────
+  deploy-test:
+    name: Deploy to Test
+    needs: [deploy-dev]
+    if: always() && !inputs.skip_test && needs.deploy-dev.result == 'success'
+    runs-on: self-hosted
+    environment: test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy via SSH
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'DEPLOY'
+            cd ${{ vars.DEPLOY_PATH }}
+            docker compose pull
+            docker compose up -d --remove-orphans
+          DEPLOY
+
+  # ── Deploy Prod ──────────────────────────────────────────────────────
+  deploy-prod:
+    name: Deploy to Prod
+    needs: [deploy-test]
+    if: always() && !inputs.skip_prod && needs.deploy-test.result == 'success'
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Deploy via SSH
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'DEPLOY'
+            cd ${{ vars.DEPLOY_PATH }}
+            docker compose pull
+            docker compose up -d --remove-orphans
+          DEPLOY

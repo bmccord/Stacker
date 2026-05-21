@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      clean:
+        description: 'Clean build (wipe caches and node_modules)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: self-hosted
+    outputs:
+      api: ${{ steps.filter.outputs.api }}
+      ui: ${{ steps.filter.outputs.ui }}
+      cli: ${{ steps.filter.outputs.cli }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check changed paths
+        id: filter
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+            echo "ui=true" >> "$GITHUB_OUTPUT"
+            echo "cli=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          else
+            BASE=${{ github.event.pull_request.base.sha }}
+            API=$(git diff --name-only $BASE HEAD -- 'stacker-api/' | head -1)
+            UI=$(git diff --name-only $BASE HEAD -- 'stacker-ui/' | head -1)
+            CLI=$(git diff --name-only $BASE HEAD -- 'stacker-cli/' | head -1)
+            DOCS=$(git diff --name-only $BASE HEAD -- 'stacker-docs/' | head -1)
+            echo "api=$( [ -n "$API" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+            echo "ui=$( [ -n "$UI" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+            echo "cli=$( [ -n "$CLI" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+            echo "docs=$( [ -n "$DOCS" ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-api:
+    name: Build & Test API
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: stacker-api
+    steps:
+      - name: Clean build (if requested)
+        if: inputs.clean
+        run: rm -rf stacker-api/node_modules stacker-api/dist
+        working-directory: .
+
+      - uses: actions/checkout@v6
+        with:
+          clean: false
+
+      - name: Clean stale build artifacts
+        run: rm -rf dist src/generated
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn run generate
+
+      - name: Unit tests
+        run: NO_COLOR=1 yarn test --reporter=verbose 2>&1 | tee test-unit.log
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## API Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -5 test-unit.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - run: yarn run build
+
+  build-ui:
+    name: Build UI
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: stacker-ui
+    steps:
+      - name: Clean build (if requested)
+        if: inputs.clean
+        run: rm -rf stacker-ui/node_modules stacker-ui/dist
+        working-directory: .
+
+      - uses: actions/checkout@v6
+        with:
+          clean: false
+
+      - name: Clean stale build artifacts
+        run: rm -rf dist
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn run build
+
+  build-cli:
+    name: Build CLI
+    needs: changes
+    if: needs.changes.outputs.cli == 'true'
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: stacker-cli
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          clean: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn run build
+
+  build-docs:
+    name: Build Docs
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: stacker-docs
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          clean: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn run build

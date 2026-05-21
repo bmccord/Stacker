@@ -1,0 +1,18 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Stacker Docs" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/stacker-docs/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="start -- --port 3001" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs />
+    <method v="2">
+      <option name="NpmBeforeRunTask" enabled="true">
+        <package-json value="$PROJECT_DIR$/stacker-docs/package.json" />
+        <command value="install" />
+        <node-interpreter value="project" />
+      </option>
+    </method>
+  </configuration>
+</component>
