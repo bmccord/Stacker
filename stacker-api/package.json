@@ -1,0 +1,44 @@
+{
+  "name": "stacker-api",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.13.0",
+  "scripts": {
+    "dev": "yarn dev:setup && yarn dev:server",
+    "dev:setup": "bash ../scripts/sync-env.sh && bash ../scripts/ensure-docker-db.sh && node scripts/ensure-db.js && yarn run generate && yarn prisma migrate deploy && yarn prisma db seed",
+    "dev:server": "nodemon --signal SIGTERM --watch src --ext ts --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "generate": "prisma generate",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@apollo/server": "^4",
+    "@prisma/adapter-mariadb": "^7",
+    "bcrypt": "^6",
+    "cors": "^2",
+    "dotenv": "^16",
+    "express": "^4",
+    "jose": "^6",
+    "mariadb": "^3",
+    "pino": "^9",
+    "pino-pretty": "^13"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5",
+    "@types/cors": "^2",
+    "@types/express": "^5",
+    "@types/node": "^22",
+    "eslint": "^9",
+    "nodemon": "^3",
+    "prisma": "^7",
+    "ts-node": "^10",
+    "typescript": "~6.0",
+    "vitest": "^4"
+  },
+  "prisma": {
+    "seed": "ts-node --project tsconfig.seed.json prisma/seed.ts"
+  }
+}

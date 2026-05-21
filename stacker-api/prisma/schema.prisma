@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model users {
+  id                            String    @id @default(uuid()) @db.VarChar(100)
+  email                         String    @unique @db.VarChar(255)
+  password_hash                 String?   @db.VarChar(255)
+  first_name                    String?   @db.VarChar(100)
+  last_name                     String?   @db.VarChar(100)
+  email_verified_at             DateTime?
+  email_verification_token      String?   @unique @db.VarChar(255)
+  email_verification_expires_at DateTime?
+  password_reset_token          String?   @unique @db.VarChar(255)
+  password_reset_expires_at     DateTime?
+  created_at                    DateTime  @default(now())
+  updated_at                    DateTime  @updatedAt
+  user_groups                   user_groups[]
+  reviews                       reviews[]
+}
+
+model groups {
+  id          String              @id @default(uuid()) @db.Char(36)
+  name        String              @db.VarChar(200)
+  slug        String              @unique @db.VarChar(200)
+  description String?             @db.VarChar(500)
+  is_system   Boolean             @default(false)
+  sort_order  Int                 @default(0)
+  created_at  DateTime            @default(now())
+  updated_at  DateTime            @updatedAt
+  permissions group_permissions[]
+  members     user_groups[]
+}
+
+model group_permissions {
+  group_id   String @db.Char(36)
+  permission String @db.VarChar(100)
+  groups     groups @relation(fields: [group_id], references: [id], onDelete: Cascade, map: "fk_gp_group")
+
+  @@id([group_id, permission])
+  @@index([group_id], map: "fk_gp_group")
+}
+
+model user_groups {
+  user_id  String @db.VarChar(100)
+  group_id String @db.Char(36)
+  users    users  @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_ug_user")
+  groups   groups @relation(fields: [group_id], references: [id], onDelete: Cascade, map: "fk_ug_group")
+
+  @@id([user_id, group_id])
+  @@index([group_id], map: "fk_ug_group")
+}
+
+model authors {
+  id         String   @id @default(uuid()) @db.Char(36)
+  name       String   @db.VarChar(200)
+  bio        String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  books      books[]
+}
+
+model books {
+  id          String   @id @default(uuid()) @db.Char(36)
+  title       String   @db.VarChar(300)
+  author_id   String   @db.Char(36)
+  genre       String?  @db.VarChar(100)
+  description String?  @db.Text
+  cover_url   String?  @db.VarChar(500)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  authors     authors  @relation(fields: [author_id], references: [id], onDelete: Cascade, map: "fk_book_author")
+  reviews     reviews[]
+
+  @@index([author_id], map: "fk_book_author")
+}
+
+model reviews {
+  id         String   @id @default(uuid()) @db.Char(36)
+  book_id    String   @db.Char(36)
+  user_id    String   @db.VarChar(100)
+  rating     Int      @db.SmallInt // 1-5
+  text       String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  books      books    @relation(fields: [book_id], references: [id], onDelete: Cascade, map: "fk_review_book")
+  users      users    @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_review_user")
+
+  @@unique([book_id, user_id]) // One review per user per book
+  @@index([book_id], map: "fk_review_book")
+  @@index([user_id], map: "fk_review_user")
+}
