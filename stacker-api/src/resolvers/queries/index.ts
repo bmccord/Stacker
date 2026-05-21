@@ -29,7 +29,7 @@ export const Queries = {
       include: { _count: { select: { books: true } } },
       orderBy: { name: 'asc' },
     });
-    return authors.map((a) => ({
+    return authors.map((a: typeof authors[number]) => ({
       id: a.id,
       name: a.name,
       bio: a.bio,
@@ -93,19 +93,19 @@ export const Queries = {
       include: { user_groups: { include: { groups: { include: { permissions: true, _count: { select: { members: true } } } } } } },
       orderBy: { created_at: 'asc' },
     });
-    return users.map((u) => ({
+    return users.map((u: typeof users[number]) => ({
       id: u.id,
       email: u.email,
       firstName: u.first_name,
       lastName: u.last_name,
       emailVerified: !!u.email_verified_at,
-      groups: u.user_groups.map((ug) => ({
+      groups: u.user_groups.map((ug: typeof u.user_groups[number]) => ({
         id: ug.groups.id,
         name: ug.groups.name,
         slug: ug.groups.slug,
         description: ug.groups.description,
         isSystem: ug.groups.is_system,
-        permissions: ug.groups.permissions.map((p) => p.permission),
+        permissions: ug.groups.permissions.map((p: { permission: string }) => p.permission),
         memberCount: ug.groups._count.members,
       })),
       createdAt: u.created_at.toISOString(),
@@ -118,13 +118,13 @@ export const Queries = {
       include: { permissions: true, _count: { select: { members: true } } },
       orderBy: { sort_order: 'asc' },
     });
-    return groups.map((g) => ({
+    return groups.map((g: typeof groups[number]) => ({
       id: g.id,
       name: g.name,
       slug: g.slug,
       description: g.description,
       isSystem: g.is_system,
-      permissions: g.permissions.map((p) => p.permission),
+      permissions: g.permissions.map((p: { permission: string }) => p.permission),
       memberCount: g._count.members,
     }));
   },
@@ -142,7 +142,7 @@ export const Queries = {
       slug: g.slug,
       description: g.description,
       isSystem: g.is_system,
-      permissions: g.permissions.map((p) => p.permission),
+      permissions: g.permissions.map((p: { permission: string }) => p.permission),
       memberCount: g._count.members,
     };
   },

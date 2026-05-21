@@ -23,8 +23,8 @@ async function main() {
     cors(),
     express.json(),
     expressMiddleware(server, {
-      context: async ({ req }) => createContext(req),
-    })
+      context: async ({ req }) => createContext(req as unknown as express.Request),
+    }) as unknown as express.RequestHandler
   );
 
   const port = parseInt(process.env.PORT ?? '4000', 10);

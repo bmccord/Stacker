@@ -67,13 +67,13 @@ export const AdminMutations = {
       firstName: user.first_name,
       lastName: user.last_name,
       emailVerified: !!user.email_verified_at,
-      groups: user.user_groups.map((ug) => ({
+      groups: user.user_groups.map((ug: typeof user.user_groups[number]) => ({
         id: ug.groups.id,
         name: ug.groups.name,
         slug: ug.groups.slug,
         description: ug.groups.description,
         isSystem: ug.groups.is_system,
-        permissions: ug.groups.permissions.map((p) => p.permission),
+        permissions: ug.groups.permissions.map((p: { permission: string }) => p.permission),
         memberCount: ug.groups._count.members,
       })),
       createdAt: user.created_at.toISOString(),
@@ -112,7 +112,7 @@ export const AdminMutations = {
 
     if (input.permissions.length > 0) {
       await ctx.prisma.group_permissions.createMany({
-        data: input.permissions.map((p) => ({ group_id: group.id, permission: p })),
+        data: input.permissions.map((p: string) => ({ group_id: group.id, permission: p })),
       });
     }
 
@@ -147,7 +147,7 @@ export const AdminMutations = {
       await ctx.prisma.group_permissions.deleteMany({ where: { group_id: input.id } });
       if (input.permissions.length > 0) {
         await ctx.prisma.group_permissions.createMany({
-          data: input.permissions.map((p) => ({ group_id: input.id, permission: p })),
+          data: input.permissions.map((p: string) => ({ group_id: input.id, permission: p })),
         });
       }
     }
@@ -164,7 +164,7 @@ export const AdminMutations = {
       slug: updated.slug,
       description: updated.description,
       isSystem: updated.is_system,
-      permissions: updated.permissions.map((p) => p.permission),
+      permissions: updated.permissions.map((p: { permission: string }) => p.permission),
       memberCount: updated._count.members,
     };
   },
