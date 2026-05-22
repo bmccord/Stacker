@@ -19,9 +19,10 @@ export async function createContext(req: Request): Promise<GraphQLContext> {
   const headers = req.headers;
   let userId: string | null = null;
 
-  // Dev bypass
-  if (process.env.DEV_ADMIN_USER_ID) {
-    userId = process.env.DEV_ADMIN_USER_ID;
+  // Dev bypass — grants full admin access without JWT
+  const devAdminId = process.env.DEV_ADMIN_USER_ID;
+  if (devAdminId) {
+    userId = devAdminId;
   }
 
   // API key auth (CLI)
@@ -48,8 +49,16 @@ export async function createContext(req: Request): Promise<GraphQLContext> {
   }
 
   // Load permissions
+  const ALL_PERMS = new Set(['books.view', 'books.manage', 'authors.view', 'authors.manage', 'reviews.view', 'reviews.manage', 'users.manage', 'settings.manage']);
   let permissions = new Set<string>();
-  if (userId && userId !== 'cli-user') {
+
+  if (devAdminId && userId === devAdminId) {
+    // Dev bypass gets all permissions
+    permissions = ALL_PERMS;
+  } else if (userId === 'cli-user') {
+    // CLI gets all permissions
+    permissions = ALL_PERMS;
+  } else if (userId) {
     const memberships = await prisma.user_groups.findMany({
       where: { user_id: userId },
       include: { groups: { include: { permissions: true } } },
@@ -67,9 +76,6 @@ export async function createContext(req: Request): Promise<GraphQLContext> {
         }
       }
     }
-  } else if (userId === 'cli-user') {
-    // CLI gets all permissions
-    permissions = new Set(['books.view', 'books.manage', 'authors.view', 'authors.manage', 'reviews.view', 'reviews.manage', 'users.manage', 'settings.manage']);
   }
 
   return {
