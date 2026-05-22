@@ -41,21 +41,18 @@ USERNAME=$(whoami | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-')
 CONFIG_NAME="${DOPPLER_BASE_CONFIG}_${USERNAME}"
 
 # Check if branch config exists
+# Check if branch config exists — skip silently if Doppler project isn't set up
 if ! doppler configs --project "$DOPPLER_PROJECT" --json 2>/dev/null | python3 -c "
 import json, sys
 configs = json.load(sys.stdin)
 sys.exit(0 if any(c['name'] == '$CONFIG_NAME' for c in configs) else 1)
 " 2>/dev/null; then
-  echo -e "${YELLOW}⚠${NC} Doppler config '$CONFIG_NAME' not found. Skipping .env sync."
-  echo "  Run 'yarn init-env' to set up your environment."
   exit 0
 fi
 
 # Check if personal values are set
 ADMIN_EMAIL=$(doppler secrets get API_SEED_ADMIN_EMAIL --project "$DOPPLER_PROJECT" --config "$CONFIG_NAME" --plain 2>/dev/null || echo "")
 if [ -z "$ADMIN_EMAIL" ]; then
-  echo -e "${YELLOW}⚠${NC} Personal values not configured. Skipping .env sync."
-  echo "  Run 'yarn init-env' to complete setup."
   exit 0
 fi
 

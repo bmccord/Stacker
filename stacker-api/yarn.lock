@@ -519,6 +519,30 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@prisma/client-runtime-utils@npm:7.8.0":
+  version: 7.8.0
+  resolution: "@prisma/client-runtime-utils@npm:7.8.0"
+  checksum: 10c0/a7de097e822aeafd46cd91184ddcdab119b605a3b4752358c69fa367dfc6c702e0e7fbbd23e54ec6c55da1afbadc017c3481c60efcc6778a16445aa47065e43e
+  languageName: node
+  linkType: hard
+
+"@prisma/client@npm:^7":
+  version: 7.8.0
+  resolution: "@prisma/client@npm:7.8.0"
+  dependencies:
+    "@prisma/client-runtime-utils": "npm:7.8.0"
+  peerDependencies:
+    prisma: "*"
+    typescript: ">=5.4.0"
+  peerDependenciesMeta:
+    prisma:
+      optional: true
+    typescript:
+      optional: true
+  checksum: 10c0/bebf35fe26b3e4356a0a89f57828456093c0f87cac4c7af8d05634552562db08eca28f3da7fd356ede09a48f08fce605506b3625435423ff62f29b98a1fdb54f
+  languageName: node
+  linkType: hard
+
 "@prisma/config@npm:7.8.0":
   version: 7.8.0
   resolution: "@prisma/config@npm:7.8.0"
@@ -2639,6 +2663,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"graphql@npm:^16.14.0":
+  version: 16.14.0
+  resolution: "graphql@npm:16.14.0"
+  checksum: 10c0/baaa368fcfeb7bf2cdf94b9f31bf916e97eaa9e7e82148a7046f31cbd49b760b38190f22393b024cbdd9ca0f4f46287515de0136b6a0cc164074b36ad7b50618
+  languageName: node
+  linkType: hard
+
 "has-flag@npm:^3.0.0":
   version: 3.0.0
   resolution: "has-flag@npm:3.0.0"
@@ -4174,6 +4205,7 @@ __metadata:
     "@apollo/server": "npm:^4"
     "@eslint/js": "npm:^10.0.1"
     "@prisma/adapter-mariadb": "npm:^7"
+    "@prisma/client": "npm:^7"
     "@types/bcrypt": "npm:^5"
     "@types/cors": "npm:^2"
     "@types/express": "npm:^5"
@@ -4184,6 +4216,7 @@ __metadata:
     eslint: "npm:^10"
     express: "npm:^4"
     globals: "npm:^17.6.0"
+    graphql: "npm:^16.14.0"
     jose: "npm:^6"
     mariadb: "npm:^3"
     nodemon: "npm:^3"
