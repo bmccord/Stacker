@@ -56,6 +56,20 @@ export const AdminMutations = {
   updateUserGroups: async (_: unknown, { userId, groupIds }: { userId: string; groupIds: string[] }, ctx: GraphQLContext) => {
     requirePermission(ctx, 'users.manage');
 
+    // Prevent removing the last administrator from the Administrators group
+    const adminGroup = await ctx.prisma.groups.findUnique({ where: { slug: 'administrators' } });
+    if (adminGroup && !groupIds.includes(adminGroup.id)) {
+      const isCurrentlyAdmin = await ctx.prisma.user_groups.findUnique({
+        where: { user_id_group_id: { user_id: userId, group_id: adminGroup.id } },
+      });
+      if (isCurrentlyAdmin) {
+        const adminCount = await ctx.prisma.user_groups.count({
+          where: { group_id: adminGroup.id },
+        });
+        if (adminCount <= 1) throw new Error('Cannot remove the last administrator from the Administrators group');
+      }
+    }
+
     // Remove all existing group memberships
     await ctx.prisma.user_groups.deleteMany({ where: { user_id: userId } });
 
@@ -96,6 +110,20 @@ export const AdminMutations = {
   removeUser: async (_: unknown, { userId }: { userId: string }, ctx: GraphQLContext) => {
     requirePermission(ctx, 'users.manage');
     if (userId === ctx.userId) throw new Error('Cannot remove yourself');
+
+    // Prevent removing the last administrator
+    const adminGroup = await ctx.prisma.groups.findUnique({ where: { slug: 'administrators' } });
+    if (adminGroup) {
+      const isAdmin = await ctx.prisma.user_groups.findUnique({
+        where: { user_id_group_id: { user_id: userId, group_id: adminGroup.id } },
+      });
+      if (isAdmin) {
+        const adminCount = await ctx.prisma.user_groups.count({
+          where: { group_id: adminGroup.id },
+        });
+        if (adminCount <= 1) throw new Error('Cannot remove the last administrator');
+      }
+    }
 
     await ctx.prisma.user_groups.deleteMany({ where: { user_id: userId } });
     await ctx.prisma.users.delete({ where: { id: userId } });
