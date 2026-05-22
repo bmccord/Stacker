@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ConfirmDeleteDialog } from '@/components/ui/ConfirmDeleteDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/use-auth';
 import { extractErrorMessage } from '@/lib/errors';
 import { GET_USERS, GET_GROUPS, INVITE_USER, UPDATE_USER_GROUPS, REMOVE_USER } from '@/graphql/queries';
 
@@ -32,6 +33,7 @@ interface AppUser {
 
 export default function UsersPage() {
   const { toast } = useToast();
+  const { userId: currentUserId } = useAuth();
   const [search, setSearch] = useState('');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -52,6 +54,8 @@ export default function UsersPage() {
       `${u.firstName} ${u.lastName}`.toLowerCase().includes(search.toLowerCase())
   );
   const groups = groupsData?.groups ?? [];
+  const allUsers = data?.users ?? [];
+  const adminCount = allUsers.filter((u) => u.groups.some((g) => g.slug === 'administrators')).length;
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -139,9 +143,11 @@ export default function UsersPage() {
                       <Button variant="ghost" size="sm" onClick={() => { setEditUser(user); setEditGroupIds(user.groups.map((g) => g.id)); }}>
                         Edit Groups
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(user)}>
-                        Remove
-                      </Button>
+                      {user.id !== currentUserId && !(user.groups.some((g) => g.slug === 'administrators') && adminCount <= 1) && (
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteTarget(user)}>
+                          Remove
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
