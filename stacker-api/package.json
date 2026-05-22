@@ -4,7 +4,7 @@
   "packageManager": "yarn@4.13.0",
   "scripts": {
     "dev": "yarn dev:setup && yarn dev:server",
-    "dev:setup": "bash ../scripts/check-env.sh && bash ../scripts/sync-env.sh && bash ../scripts/ensure-docker-db.sh && node -e \"try{require('child_process').execSync('lsof -ti:4000|xargs kill -9',{stdio:'ignore'})}catch(e){}\" && node scripts/ensure-db.js && yarn run generate && yarn prisma migrate deploy && yarn prisma db seed",
+    "dev:setup": "bash ../scripts/check-env.sh && bash ../scripts/sync-env.sh && bash ../scripts/ensure-docker-db.sh && bash ../scripts/kill-port.sh && node scripts/ensure-db.js && yarn run generate && yarn prisma migrate deploy && yarn prisma db seed",
     "dev:server": "nodemon --signal SIGTERM --watch src --ext ts --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
