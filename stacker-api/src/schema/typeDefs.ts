@@ -81,6 +81,19 @@ export const typeDefs = `#graphql
     userCount: Int!
   }
 
+  type LogEntry {
+    level: Int!
+    levelLabel: String!
+    time: String!
+    msg: String!
+    data: String
+  }
+
+  type LogResult {
+    entries: [LogEntry!]!
+    total: Int!
+  }
+
   # ── Inputs ──────────────────────────────────────────────────────────────
 
   input UpsertAuthorInput {
@@ -130,6 +143,7 @@ export const typeDefs = `#graphql
 
     # Authenticated
     me: User
+    myPermissions: [String!]!
     dashboardStats: DashboardStats!
     allPermissions: [PermissionCategory!]!
 
@@ -137,6 +151,17 @@ export const typeDefs = `#graphql
     users: [AppUser!]!
     groups: [Group!]!
     group(id: String!): Group
+
+    # System (settings.manage)
+    systemLogs(
+      limit: Int
+      offset: Int
+      level: String
+      search: String
+      startDate: String
+      endDate: String
+    ): LogResult!
+    systemLogLevel: String!
 
     # API version
     apiVersion: String!
@@ -169,6 +194,9 @@ export const typeDefs = `#graphql
     inviteUser(email: String!, groupIds: [String!]!): Boolean!
     updateUserGroups(userId: String!, groupIds: [String!]!): AppUser!
     removeUser(userId: String!): Boolean!
+
+    # System (settings.manage)
+    setSystemLogLevel(level: String!): Boolean!
 
     # Groups (users.manage)
     createGroup(input: CreateGroupInput!): Group!

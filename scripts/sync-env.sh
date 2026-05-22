@@ -5,6 +5,9 @@
 # Called by `yarn dev` in each project to ensure .env files are up to date.
 # If Doppler is not configured, prints a message and exits (does not block dev).
 #
+# If a local .env file has changes not in Doppler, warns the developer and
+# skips the overwrite so they can run `yarn push-env` first.
+#
 
 set -euo pipefail
 
@@ -26,13 +29,13 @@ NC='\033[0m'
 # Check if Doppler is available and authenticated
 if ! command -v doppler &> /dev/null; then
   echo -e "${YELLOW}⚠${NC} Doppler CLI not installed. Skipping .env sync."
-  echo "  Install Doppler or create .env files manually."
+  echo "  Run 'yarn init-env' to set up your environment."
   exit 0
 fi
 
 if ! doppler me &> /dev/null; then
   echo -e "${YELLOW}⚠${NC} Doppler not authenticated. Skipping .env sync."
-  echo "  Run 'doppler login' to authenticate."
+  echo "  Run 'yarn init-env' to set up your environment."
   exit 0
 fi
 
@@ -47,13 +50,22 @@ configs = json.load(sys.stdin)
 sys.exit(0 if any(c['name'] == '$CONFIG_NAME' for c in configs) else 1)
 " 2>/dev/null; then
   echo -e "${YELLOW}⚠${NC} Doppler config '$CONFIG_NAME' not found. Skipping .env sync."
+  echo "  Run 'yarn init-env' to set up your environment."
+  exit 0
+fi
+
+# Check if personal values are set
+ADMIN_EMAIL=$(doppler secrets get API_SEED_ADMIN_EMAIL --project "$DOPPLER_PROJECT" --config "$CONFIG_NAME" --plain 2>/dev/null || echo "")
+if [ -z "$ADMIN_EMAIL" ]; then
+  echo -e "${YELLOW}⚠${NC} Personal values not configured. Skipping .env sync."
+  echo "  Run 'yarn init-env' to complete setup."
   exit 0
 fi
 
 # Fetch secrets from Doppler
 SECRETS=$(doppler secrets --project "$DOPPLER_PROJECT" --config "$CONFIG_NAME" --json 2>/dev/null)
 
-# Generate .env content
+# Generate .env content to a temp directory, then compare before overwriting
 TMPDIR_SYNC=$(mktemp -d)
 trap "rm -rf $TMPDIR_SYNC" EXIT
 
@@ -64,7 +76,8 @@ skip = {'DOPPLER_CONFIG', 'DOPPLER_ENVIRONMENT', 'DOPPLER_PROJECT'}
 
 def write_env(path, prefix):
     with open(path, 'w') as f:
-        f.write('# Auto-generated from Doppler — do not edit manually.\n\n')
+        f.write('# Auto-generated from Doppler — do not edit manually.\n')
+        f.write('# Update via Doppler or run: yarn push-env\n\n')
         for k, v in sorted(d.items()):
             if k in skip:
                 continue
@@ -79,36 +92,71 @@ write_env('$TMPDIR_SYNC/cli.env', 'CLI_')
 write_env('$TMPDIR_SYNC/root.env', 'ROOT_')
 "
 
-# Compare and write each file
+# Compare and write each file, warning if local has unpushed changes
+HAS_DRIFT=false
+
 check_and_write() {
   local new_file="$1"
   local target_file="$2"
   local label="$3"
 
   if [ ! -f "$target_file" ]; then
+    # No existing file — just write it
     cp "$new_file" "$target_file"
     return
   fi
 
-  local existing_content new_content
+  # Compare what Doppler would generate vs what's on disk
+  # Strip the header comments before comparing (they don't matter)
+  local existing_content
+  local new_content
   existing_content=$(grep -v '^#' "$target_file" | grep -v '^$' | sort)
   new_content=$(grep -v '^#' "$new_file" | grep -v '^$' | sort)
 
   if [ "$existing_content" = "$new_content" ]; then
+    # Identical — overwrite is safe (updates header comment if needed)
     cp "$new_file" "$target_file"
     return
   fi
 
-  if [ "$FORCE" = true ]; then
-    cp "$new_file" "$target_file"
-  else
-    echo -e "${YELLOW}⚠${NC} ${label} has local changes. Use --force to overwrite."
-  fi
+  # There's a difference — show the developer what changed
+  HAS_DRIFT=true
+  echo -e "${YELLOW}⚠${NC} ${label} has local changes not in Doppler:"
+
+  # Show the diff (keys/values that differ)
+  local diff_output
+  diff_output=$(diff <(echo "$new_content") <(echo "$existing_content") 2>/dev/null || true)
+  echo "$diff_output" | grep '^[<>]' | while IFS= read -r line; do
+    if [[ "$line" == "< "* ]]; then
+      echo -e "  ${GREEN}+ Doppler:${NC} ${line:2}"
+    elif [[ "$line" == "> "* ]]; then
+      echo -e "  ${RED}- Local:${NC}  ${line:2}"
+    fi
+  done
+
+  echo ""
 }
 
 check_and_write "$TMPDIR_SYNC/api.env" "$REPO_ROOT/stacker-api/.env" "stacker-api/.env"
 check_and_write "$TMPDIR_SYNC/ui.env" "$REPO_ROOT/stacker-ui/.env" "stacker-ui/.env"
 check_and_write "$TMPDIR_SYNC/cli.env" "$REPO_ROOT/stacker-cli/.env" "stacker-cli/.env"
 check_and_write "$TMPDIR_SYNC/root.env" "$REPO_ROOT/.env" "root .env"
+
+if [ "$HAS_DRIFT" = true ]; then
+  if [ "$FORCE" = true ]; then
+    echo -e "${YELLOW}⚠${NC} Overwriting local changes (--force)."
+    cp "$TMPDIR_SYNC/api.env" "$REPO_ROOT/stacker-api/.env"
+    cp "$TMPDIR_SYNC/ui.env" "$REPO_ROOT/stacker-ui/.env"
+    cp "$TMPDIR_SYNC/cli.env" "$REPO_ROOT/stacker-cli/.env"
+    cp "$TMPDIR_SYNC/root.env" "$REPO_ROOT/.env"
+    echo -e "${GREEN}✔${NC} .env files synced from Doppler (forced)"
+  else
+    echo -e "${YELLOW}⚠${NC} Some .env files have local changes that would be overwritten."
+    echo "  Run 'yarn push-env' to push your changes to Doppler first,"
+    echo "  or 'yarn sync-env --force' to overwrite local changes."
+    echo ""
+  fi
+  exit 0
+fi
 
 echo -e "${GREEN}✔${NC} .env files synced from Doppler"

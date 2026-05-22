@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "packageManager": "yarn@4.13.0",
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "init-env": "bash scripts/init-env.sh",
+    "sync-env": "bash scripts/sync-env.sh",
+    "push-env": "bash scripts/push-env.sh",
+    "reset-password": "cd stacker-api && yarn reset-password"
+  }
+}

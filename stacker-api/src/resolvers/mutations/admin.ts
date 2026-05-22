@@ -1,9 +1,22 @@
 import { GraphQLContext } from '../../context';
 import { requirePermission, validateRequired, validateEmail, validateMaxLength } from '../helpers';
 import { hashPassword } from '../../services/auth';
+import { LOG_LEVELS } from '../../logger';
 import crypto from 'crypto';
 
 export const AdminMutations = {
+  // ── System ──────────────────────────────────────────────────────────────
+
+  setSystemLogLevel: (_: unknown, { level }: { level: string }, ctx: GraphQLContext) => {
+    requirePermission(ctx, 'settings.manage');
+    if (!LOG_LEVELS.includes(level as typeof LOG_LEVELS[number])) {
+      throw new Error(`Invalid log level. Must be one of: ${LOG_LEVELS.join(', ')}`);
+    }
+    process.env.LOG_LEVEL = level;
+    ctx.log.info({ level }, 'System log level changed');
+    return true;
+  },
+
   // ── Users ──────────────────────────────────────────────────────────────
 
   inviteUser: async (_: unknown, { email, groupIds }: { email: string; groupIds: string[] }, ctx: GraphQLContext) => {

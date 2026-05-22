@@ -27,7 +27,7 @@ export default function BookFormPage() {
   const { toast } = useToast();
   const isEdit = !!id;
 
-  const { data: bookData, loading: bookLoading } = useQuery(GET_BOOK, { variables: { id }, skip: !id });
+  const { data: bookData, loading: bookLoading } = useQuery<{ book: { id: string; title: string; authorId: string; genre: string | null; description: string | null; coverUrl: string | null } | null }>(GET_BOOK, { variables: { id }, skip: !id });
   const { data: authorsData } = useQuery<{ authors: { id: string; name: string }[] }>(GET_AUTHORS);
   const [upsert, { loading: saving }] = useMutation(UPSERT_BOOK, { refetchQueries: [{ query: GET_BOOKS }] });
 

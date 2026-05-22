@@ -1,0 +1,82 @@
+name: Seed Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - production
+      confirm_production:
+        description: 'Type SYNC PRODUCTION to confirm (required for production only)'
+        required: false
+        type: string
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: self-hosted
+    steps:
+      - name: Block production without confirmation
+        if: inputs.environment == 'production' && inputs.confirm_production != 'SYNC PRODUCTION'
+        run: |
+          echo "::error::Production sync requires typing 'SYNC PRODUCTION' in the confirmation field."
+          exit 1
+
+  sync-dev:
+    name: Sync Seed Data — Dev
+    needs: validate
+    if: inputs.environment == 'dev'
+    runs-on: self-hosted
+    environment: dev
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Copy seed data and run seed
+        run: |
+          scp -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "\
+            cd ${{ vars.DEPLOY_PATH }} \
+            && docker cp seed-data/. \$(docker compose ps -q api):/app/prisma/seed-data/ \
+            && docker compose exec -T api yarn prisma db seed \
+            && rm -rf seed-data"
+
+  sync-test:
+    name: Sync Seed Data — Test
+    needs: validate
+    if: inputs.environment == 'test'
+    runs-on: self-hosted
+    environment: test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Copy seed data and run seed
+        run: |
+          scp -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "\
+            cd ${{ vars.DEPLOY_PATH }} \
+            && docker cp seed-data/. \$(docker compose ps -q api):/app/prisma/seed-data/ \
+            && docker compose exec -T api yarn prisma db seed \
+            && rm -rf seed-data"
+
+  sync-prod:
+    name: Sync Seed Data — Production
+    needs: validate
+    if: inputs.environment == 'production'
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Copy seed data and run seed
+        run: |
+          scp -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "\
+            cd ${{ vars.DEPLOY_PATH }} \
+            && docker cp seed-data/. \$(docker compose ps -q api):/app/prisma/seed-data/ \
+            && docker compose exec -T api yarn prisma db seed \
+            && rm -rf seed-data"

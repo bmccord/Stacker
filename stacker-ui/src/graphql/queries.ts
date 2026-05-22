@@ -36,6 +36,10 @@ export const GET_ME = gql`
   query GetMe { me { id email firstName lastName emailVerified } }
 `;
 
+export const GET_MY_PERMISSIONS = gql`
+  query GetMyPermissions { myPermissions }
+`;
+
 // ── Books ─────────────────────────────────────────────────────────────────
 
 export const GET_BOOKS = gql`

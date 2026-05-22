@@ -1,0 +1,46 @@
+#!/bin/sh
+
+echo "Running TypeScript type checks..."
+
+# Check UI (must target tsconfig.app.json directly — root tsconfig.json
+# uses project references with "files": [], so tsc --noEmit checks nothing)
+cd stacker-ui
+npx tsc -p tsconfig.app.json --noEmit
+UI_EXIT=$?
+cd ..
+
+# Check API
+cd stacker-api
+npx tsc --noEmit
+API_EXIT=$?
+cd ..
+
+if [ $UI_EXIT -ne 0 ] || [ $API_EXIT -ne 0 ]; then
+  echo ""
+  echo "Type check failed. Fix the errors above before committing."
+  exit 1
+fi
+
+echo "Type checks passed."
+
+echo "Running lint checks..."
+
+# Lint API (only errors block commit, warnings are allowed)
+cd stacker-api
+npx eslint . --quiet
+API_LINT=$?
+cd ..
+
+# Lint UI
+cd stacker-ui
+npx eslint . --quiet
+UI_LINT=$?
+cd ..
+
+if [ $API_LINT -ne 0 ] || [ $UI_LINT -ne 0 ]; then
+  echo ""
+  echo "Lint errors found. Fix the errors above before committing."
+  exit 1
+fi
+
+echo "Lint checks passed."

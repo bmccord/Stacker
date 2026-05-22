@@ -21,7 +21,7 @@ export default function AuthorFormPage() {
   const { toast } = useToast();
   const isEdit = !!id;
 
-  const { data: authorData, loading: authorLoading } = useQuery(GET_AUTHOR, { variables: { id }, skip: !id });
+  const { data: authorData, loading: authorLoading } = useQuery<{ author: { id: string; name: string; bio: string | null } | null }>(GET_AUTHOR, { variables: { id }, skip: !id });
   const [upsert, { loading: saving }] = useMutation(UPSERT_AUTHOR, { refetchQueries: [{ query: GET_AUTHORS }] });
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({

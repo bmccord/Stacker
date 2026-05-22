@@ -27,12 +27,13 @@ export default function GroupFormPage() {
   const { toast } = useToast();
   const isEdit = !!id;
 
-  const { data: groupData, loading: groupLoading } = useQuery(GET_GROUP, { variables: { id }, skip: !id });
+  const { data: groupData, loading: groupLoading } = useQuery<{ group: { id: string; name: string; slug: string; description: string | null; isSystem: boolean; permissions: string[]; memberCount: number } | null }>(GET_GROUP, { variables: { id }, skip: !id });
   const { data: permData } = useQuery<{ allPermissions: PermissionCategory[] }>(GET_ALL_PERMISSIONS);
   const [createGroup, { loading: creating }] = useMutation(CREATE_GROUP, { refetchQueries: [{ query: GET_GROUPS }] });
   const [updateGroup, { loading: updating }] = useMutation(UPDATE_GROUP, { refetchQueries: [{ query: GET_GROUPS }] });
 
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [permissionsInitialized, setPermissionsInitialized] = useState(false);
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     defaultValues: { name: '', description: '' },
   });
@@ -41,9 +42,14 @@ export default function GroupFormPage() {
     if (groupData?.group) {
       const g = groupData.group;
       reset({ name: g.name, description: g.description ?? '' });
-      setSelectedPermissions(g.permissions ?? []);
     }
   }, [groupData, reset]);
+
+  // Sync permissions from query data once on load (avoids setState-in-effect lint error)
+  if (groupData?.group && !permissionsInitialized) {
+    setSelectedPermissions(groupData.group.permissions ?? []);
+    setPermissionsInitialized(true);
+  }
 
   function togglePermission(permId: string) {
     setSelectedPermissions((prev) =>

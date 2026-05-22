@@ -4,6 +4,7 @@ import { ApolloProviderWrapper } from '@/lib/apollo';
 import PublicLayout from '@/components/layout/PublicLayout';
 import AppLayout from '@/components/layout/AppLayout';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
+import RequirePermission from '@/components/layout/RequirePermission';
 import SignInPage from '@/pages/SignInPage';
 
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'));
@@ -40,16 +41,16 @@ export default function App() {
           }
         >
           <Route index element={<DashboardPage />} />
-          <Route path="books" element={<BooksPage />} />
-          <Route path="books/new" element={<BookFormPage />} />
-          <Route path="books/:id" element={<BookFormPage />} />
-          <Route path="authors" element={<AuthorsPage />} />
-          <Route path="authors/new" element={<AuthorFormPage />} />
-          <Route path="authors/:id" element={<AuthorFormPage />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="groups" element={<GroupsPage />} />
-          <Route path="groups/new" element={<GroupFormPage />} />
-          <Route path="groups/:id" element={<GroupFormPage />} />
+          <Route path="books" element={<RequirePermission permission="books.view"><BooksPage /></RequirePermission>} />
+          <Route path="books/new" element={<RequirePermission permission="books.manage"><BookFormPage /></RequirePermission>} />
+          <Route path="books/:id" element={<RequirePermission permission="books.manage"><BookFormPage /></RequirePermission>} />
+          <Route path="authors" element={<RequirePermission permission="authors.view"><AuthorsPage /></RequirePermission>} />
+          <Route path="authors/new" element={<RequirePermission permission="authors.manage"><AuthorFormPage /></RequirePermission>} />
+          <Route path="authors/:id" element={<RequirePermission permission="authors.manage"><AuthorFormPage /></RequirePermission>} />
+          <Route path="users" element={<RequirePermission permission="users.manage"><UsersPage /></RequirePermission>} />
+          <Route path="groups" element={<RequirePermission permission="users.manage"><GroupsPage /></RequirePermission>} />
+          <Route path="groups/new" element={<RequirePermission permission="users.manage"><GroupFormPage /></RequirePermission>} />
+          <Route path="groups/:id" element={<RequirePermission permission="users.manage"><GroupFormPage /></RequirePermission>} />
         </Route>
 
         {/* Fallback */}

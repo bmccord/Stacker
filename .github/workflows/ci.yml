@@ -59,7 +59,17 @@ jobs:
     steps:
       - name: Clean build (if requested)
         if: inputs.clean
-        run: rm -rf stacker-api/node_modules stacker-api/dist
+        run: rm -rf stacker-api/node_modules stacker-api/dist ~/.yarn/berry/cache
+        working-directory: .
+
+      - name: Free disk space if low
+        run: |
+          FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
+          echo "Free disk space: ${FREE}GB"
+          if [ "$FREE" -lt 1 ]; then
+            echo "Low disk — clearing caches"
+            rm -rf ~/.yarn/berry/cache node_modules
+          fi
         working-directory: .
 
       - uses: actions/checkout@v6
@@ -101,7 +111,17 @@ jobs:
     steps:
       - name: Clean build (if requested)
         if: inputs.clean
-        run: rm -rf stacker-ui/node_modules stacker-ui/dist
+        run: rm -rf stacker-ui/node_modules stacker-ui/dist ~/.yarn/berry/cache
+        working-directory: .
+
+      - name: Free disk space if low
+        run: |
+          FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
+          echo "Free disk space: ${FREE}GB"
+          if [ "$FREE" -lt 1 ]; then
+            echo "Low disk — clearing caches"
+            rm -rf ~/.yarn/berry/cache node_modules
+          fi
         working-directory: .
 
       - uses: actions/checkout@v6
@@ -128,6 +148,16 @@ jobs:
       run:
         working-directory: stacker-cli
     steps:
+      - name: Free disk space if low
+        run: |
+          FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
+          echo "Free disk space: ${FREE}GB"
+          if [ "$FREE" -lt 1 ]; then
+            echo "Low disk — clearing caches"
+            rm -rf ~/.yarn/berry/cache node_modules
+          fi
+        working-directory: .
+
       - uses: actions/checkout@v6
         with:
           clean: false
@@ -149,6 +179,16 @@ jobs:
       run:
         working-directory: stacker-docs
     steps:
+      - name: Free disk space if low
+        run: |
+          FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
+          echo "Free disk space: ${FREE}GB"
+          if [ "$FREE" -lt 1 ]; then
+            echo "Low disk — clearing caches"
+            rm -rf ~/.yarn/berry/cache node_modules
+          fi
+        working-directory: .
+
       - uses: actions/checkout@v6
         with:
           clean: false

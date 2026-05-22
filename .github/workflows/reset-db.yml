@@ -1,0 +1,70 @@
+name: Reset Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - production
+      confirm_production:
+        description: 'Type RESET PRODUCTION to confirm (required for production only)'
+        required: false
+        type: string
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: self-hosted
+    steps:
+      - name: Block production without confirmation
+        if: inputs.environment == 'production' && inputs.confirm_production != 'RESET PRODUCTION'
+        run: |
+          echo "::error::Production reset requires typing 'RESET PRODUCTION' in the confirmation field."
+          exit 1
+
+  reset-dev:
+    name: Reset Dev Database
+    needs: validate
+    if: inputs.environment == 'dev'
+    runs-on: self-hosted
+    environment: dev
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Reset database
+        run: |
+          scp .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+
+  reset-test:
+    name: Reset Test Database
+    needs: validate
+    if: inputs.environment == 'test'
+    runs-on: self-hosted
+    environment: test
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Reset database
+        run: |
+          scp .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+
+  reset-prod:
+    name: Reset Production Database
+    needs: validate
+    if: inputs.environment == 'production'
+    runs-on: self-hosted
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Reset database
+        run: |
+          scp .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"

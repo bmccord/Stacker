@@ -1,6 +1,7 @@
 import { GraphQLContext } from '../../context';
 import { requirePermission } from '../helpers';
 import { PERMISSION_GROUPS } from '../../permissions';
+import { readLogs, levelLabel } from '../../logger';
 
 export const Queries = {
   // ── Public ──────────────────────────────────────────────────────────────
@@ -70,6 +71,11 @@ export const Queries = {
       emailVerified: !!user.email_verified_at,
       createdAt: user.created_at instanceof Date ? user.created_at.toISOString() : user.created_at,
     };
+  },
+
+  myPermissions: (_: unknown, __: unknown, ctx: GraphQLContext) => {
+    if (!ctx.userId) return [];
+    return Array.from(ctx.permissions);
   },
 
   dashboardStats: async (_: unknown, __: unknown, ctx: GraphQLContext) => {
@@ -145,6 +151,41 @@ export const Queries = {
       permissions: g.permissions.map((p: { permission: string }) => p.permission),
       memberCount: g._count.members,
     };
+  },
+
+  // ── System ──────────────────────────────────────────────────────────────
+
+  systemLogs: (_: unknown, args: {
+    limit?: number;
+    offset?: number;
+    level?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+  }, ctx: GraphQLContext) => {
+    requirePermission(ctx, 'settings.manage');
+
+    const { entries, total } = readLogs(args);
+
+    return {
+      entries: entries.map((e) => ({
+        level: e.level,
+        levelLabel: levelLabel(e.level),
+        time: typeof e.time === 'number' ? new Date(e.time).toISOString() : e.time,
+        msg: e.msg ?? '',
+        data: JSON.stringify(
+          Object.fromEntries(
+            Object.entries(e).filter(([k]) => !['level', 'time', 'msg', 'pid', 'hostname'].includes(k))
+          )
+        ),
+      })),
+      total,
+    };
+  },
+
+  systemLogLevel: (_: unknown, __: unknown, ctx: GraphQLContext) => {
+    requirePermission(ctx, 'settings.manage');
+    return process.env.LOG_LEVEL ?? 'info';
   },
 
   apiVersion: () => process.env.APP_VERSION ?? 'dev',
