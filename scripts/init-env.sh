@@ -2,17 +2,16 @@
 #
 # init-env.sh — One-time environment setup for Stacker development.
 #
-# This script:
-#   1. Ensures Doppler CLI is installed and authenticated
-#   2. Creates a personal Doppler branch config (local_<username>)
-#   3. Prompts for developer name/email on first run
-#   4. Generates a local dev password and bcrypt hash
-#   5. Stores personal values in Doppler
-#   6. Generates all .env files from Doppler
+# Two modes:
+#   1. With Doppler: Creates a personal branch config, stores secrets in Doppler,
+#      and generates .env files from it. Best for teams.
+#   2. Without Doppler: Generates .env files locally with auto-generated secrets.
+#      Works out of the box for solo developers or quick starts.
 #
 # Usage:
 #   yarn init-env              # Interactive first-time setup
 #   yarn init-env --sync       # Just regenerate .env files (no prompts)
+#   yarn init-env --local      # Force local mode (skip Doppler even if installed)
 #
 
 set -euo pipefail
@@ -35,34 +34,62 @@ success() { echo -e "${GREEN}✔${NC} $1"; }
 warn()  { echo -e "${YELLOW}⚠${NC} $1"; }
 error() { echo -e "${RED}✖${NC} $1" >&2; }
 
-# ── Step 1: Check Doppler CLI ────────────────────────────────────────────────
+# ── Parse flags ──────────────────────────────────────────────────────────────
 
-check_doppler() {
+SYNC_ONLY="false"
+FORCE_LOCAL="false"
+for arg in "$@"; do
+  case "$arg" in
+    --sync) SYNC_ONLY="true" ;;
+    --local) FORCE_LOCAL="true" ;;
+  esac
+done
+
+# ── Detect Doppler availability ──────────────────────────────────────────────
+
+USE_DOPPLER="false"
+
+detect_doppler() {
+  if [ "$FORCE_LOCAL" = "true" ]; then
+    info "Local mode (--local flag)"
+    return
+  fi
+
   if ! command -v doppler &> /dev/null; then
-    error "Doppler CLI is not installed."
-    echo ""
+    warn "Doppler CLI not installed — using local mode."
+    echo "  To use Doppler for team secrets management, install it:"
     echo "  macOS:   brew install dopplerhq/cli/doppler"
-    echo "  Linux:   curl -sLf --retry 3 --tlsv1.2 --proto \"=https\" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | sudo gpg --import && sudo apt install doppler"
-    echo "  Windows: winget install doppler"
     echo ""
-    echo "  See: https://docs.doppler.com/docs/install-cli"
-    exit 1
+    return
   fi
-}
 
-check_doppler_auth() {
   if ! doppler me &> /dev/null; then
-    info "Doppler CLI is not authenticated. Opening browser to log in..."
-    doppler login
-    if ! doppler me &> /dev/null; then
-      error "Doppler authentication failed. Run 'doppler login' manually."
-      exit 1
+    echo ""
+    echo -e "  Doppler CLI is installed but not authenticated."
+    echo ""
+    echo "  1) Set up Doppler (recommended for teams)"
+    echo "  2) Skip Doppler — generate .env files locally"
+    echo ""
+    read -r -p "  Choice [1/2]: " doppler_choice
+    if [ "$doppler_choice" = "1" ]; then
+      info "Opening browser to log in..."
+      doppler login
+      if ! doppler me &> /dev/null; then
+        error "Doppler authentication failed. Falling back to local mode."
+        return
+      fi
+      USE_DOPPLER="true"
+    else
+      info "Using local mode."
     fi
+    return
   fi
+
+  USE_DOPPLER="true"
   success "Doppler authenticated"
 }
 
-# ── Step 2: Personal branch config ───────────────────────────────────────────
+# ── Doppler helpers ──────────────────────────────────────────────────────────
 
 get_username() {
   local user
@@ -87,193 +114,222 @@ sys.exit(0 if any(c['name'] == '$config_name' for c in configs) else 1)
   success "Created Doppler config '$config_name'"
 }
 
-# ── Step 3: Developer provisioning ───────────────────────────────────────────
+# ── Developer prompts (shared by both modes) ─────────────────────────────────
 
 prompt_developer_info() {
-  local config_name="$1"
-
   echo ""
   echo -e "${CYAN}━━━ Developer Setup ━━━${NC}"
   echo ""
 
-  # Check if personal values already exist
-  local existing_email
-  existing_email=$(doppler secrets get API_SEED_ADMIN_EMAIL --project "$DOPPLER_PROJECT" --config "$config_name" --plain 2>/dev/null || echo "")
-
-  if [ -n "$existing_email" ] && [ "$SYNC_ONLY" = "false" ]; then
-    echo "  Current developer: $existing_email"
-    echo ""
-    read -r -p "  Reconfigure? (y/N): " reconfigure
-    if [[ ! "$reconfigure" =~ ^[Yy]$ ]]; then
-      success "Keeping existing configuration"
-      return 0
+  # Check if .env already has values (local mode reconfigure check)
+  if [ -f "$REPO_ROOT/stacker-api/.env" ]; then
+    local existing_email
+    existing_email=$(grep '^SEED_ADMIN_EMAIL=' "$REPO_ROOT/stacker-api/.env" 2>/dev/null | sed 's/^SEED_ADMIN_EMAIL=//' | tr -d '"' || echo "")
+    if [ -n "$existing_email" ] && [ "$existing_email" != "admin@example.com" ]; then
+      echo "  Current developer: $existing_email"
+      echo ""
+      read -r -p "  Reconfigure? (y/N): " reconfigure
+      if [[ ! "$reconfigure" =~ ^[Yy]$ ]]; then
+        success "Keeping existing configuration"
+        return 1  # Signal: skip provisioning
+      fi
     fi
   fi
 
-  # Prompt for info
-  read -r -p "  First name: " first_name
-  read -r -p "  Last name: " last_name
-  read -r -p "  Email: " email
+  read -r -p "  First name: " SETUP_FIRST_NAME
+  read -r -p "  Last name: " SETUP_LAST_NAME
+  read -r -p "  Email: " SETUP_EMAIL
 
-  if [ -z "$first_name" ] || [ -z "$last_name" ] || [ -z "$email" ]; then
+  if [ -z "$SETUP_FIRST_NAME" ] || [ -z "$SETUP_LAST_NAME" ] || [ -z "$SETUP_EMAIL" ]; then
     error "All fields are required."
     exit 1
   fi
 
-  info "Setting up local dev account..."
-  provision_dev_user "$config_name" "$first_name" "$last_name" "$email"
+  # Generate a random password
+  SETUP_PASSWORD=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
+
+  echo ""
+  echo -e "  ${YELLOW}┌─────────────────────────────────────────────────┐${NC}"
+  echo -e "  ${YELLOW}│  Your local dev password: ${NC}${SETUP_PASSWORD}"
+  echo -e "  ${YELLOW}│  Saved in stacker-api/.env (SEED_ADMIN_PASSWORD)│${NC}"
+  echo -e "  ${YELLOW}└─────────────────────────────────────────────────┘${NC}"
+  echo ""
+
+  return 0
 }
 
-provision_dev_user() {
+# ── Doppler mode: store in Doppler + generate from Doppler ───────────────────
+
+doppler_provision() {
   local config_name="$1"
-  local first_name="$2"
-  local last_name="$3"
-  local email="$4"
 
-  # Generate a random password
-  local password
-  password=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
-
-  echo ""
-  echo -e "  ${YELLOW}┌─────────────────────────────────────────────┐${NC}"
-  echo -e "  ${YELLOW}│  Your local dev password: ${NC}${password}${YELLOW}  │${NC}"
-  echo -e "  ${YELLOW}│  Stored in Doppler. View anytime with:      │${NC}"
-  echo -e "  ${YELLOW}│  doppler secrets get API_SEED_ADMIN_PASSWORD│${NC}"
-  echo -e "  ${YELLOW}└─────────────────────────────────────────────┘${NC}"
-  echo ""
-
-  # Store personal values in Doppler (plain-text password — Doppler encrypts it;
-  # the seed script hashes it at runtime with bcrypt)
   info "Storing personal configuration in Doppler..."
   doppler secrets set \
     --project "$DOPPLER_PROJECT" --config "$config_name" \
-    API_SEED_ADMIN_EMAIL="$email" \
-    API_SEED_ADMIN_FIRST_NAME="$first_name" \
-    API_SEED_ADMIN_LAST_NAME="$last_name" \
-    API_SEED_ADMIN_PASSWORD="$password" \
+    API_SEED_ADMIN_EMAIL="$SETUP_EMAIL" \
+    API_SEED_ADMIN_FIRST_NAME="$SETUP_FIRST_NAME" \
+    API_SEED_ADMIN_LAST_NAME="$SETUP_LAST_NAME" \
+    API_SEED_ADMIN_PASSWORD="$SETUP_PASSWORD" \
     > /dev/null
 
   success "Personal configuration saved to Doppler"
 }
 
-# ── Step 4: Generate .env files ──────────────────────────────────────────────
+doppler_generate_env_files() {
+  local config_name="$1"
+
+  info "Generating .env files from Doppler..."
+
+  local secrets
+  secrets=$(doppler secrets --project "$DOPPLER_PROJECT" --config "$config_name" --json 2>/dev/null)
+
+  echo "$secrets" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+skip = {'DOPPLER_CONFIG', 'DOPPLER_ENVIRONMENT', 'DOPPLER_PROJECT'}
+
+def write_env(path, prefix, header):
+    with open(path, 'w') as f:
+        f.write(header)
+        for k, v in sorted(d.items()):
+            if k in skip:
+                continue
+            val = v.get('computed', '')
+            if k.startswith(prefix):
+                env_key = k[len(prefix):]
+                f.write(f'{env_key}=\"{val}\"\n')
+
+hdr = '# Auto-generated by init-env.sh from Doppler — do not edit manually.\n# Update via Doppler or run: yarn push-env\n\n'
+write_env('$REPO_ROOT/stacker-api/.env', 'API_', hdr)
+write_env('$REPO_ROOT/stacker-ui/.env', 'UI_', hdr)
+write_env('$REPO_ROOT/stacker-cli/.env', 'CLI_', hdr)
+write_env('$REPO_ROOT/.env', 'ROOT_', hdr)
+"
+
+  success "Generated .env files from Doppler"
+}
+
+# ── Local mode: generate .env files directly ─────────────────────────────────
+
+local_generate_env_files() {
+  info "Generating .env files locally..."
+
+  # Generate secrets
+  local jwt_secret
+  jwt_secret=$(openssl rand -base64 32)
+  local api_key
+  api_key="sk-$(openssl rand -hex 16)"
+  local db_password="devpass123"
+
+  # stacker-api/.env
+  cat > "$REPO_ROOT/stacker-api/.env" << ENVEOF
+# Generated by init-env.sh (local mode).
+# To switch to Doppler, run: yarn init-env (with Doppler CLI installed)
+
+DATABASE_URL="mysql://root:${db_password}@127.0.0.1:3306/stacker-local"
+JWT_SECRET="${jwt_secret}"
+PORT="4000"
+DEV_ADMIN_USER_ID="dev-admin"
+STACKER_API_KEY="${api_key}"
+SEED_ADMIN_EMAIL="${SETUP_EMAIL}"
+SEED_ADMIN_PASSWORD="${SETUP_PASSWORD}"
+SEED_ADMIN_FIRST_NAME="${SETUP_FIRST_NAME}"
+SEED_ADMIN_LAST_NAME="${SETUP_LAST_NAME}"
+ENVEOF
+
+  # stacker-ui/.env
+  cat > "$REPO_ROOT/stacker-ui/.env" << ENVEOF
+# Generated by init-env.sh (local mode).
+
+VITE_API_URL="http://localhost:4000/graphql"
+ENVEOF
+
+  # stacker-cli/.env
+  cat > "$REPO_ROOT/stacker-cli/.env" << ENVEOF
+# Generated by init-env.sh (local mode).
+
+STACKER_API_URL="http://localhost:4000/graphql"
+STACKER_API_KEY="${api_key}"
+ENVEOF
+
+  # root .env
+  cat > "$REPO_ROOT/.env" << ENVEOF
+# Generated by init-env.sh (local mode).
+
+DB_ROOT_PASSWORD="${db_password}"
+ENVEOF
+
+  success "Generated .env files locally"
+}
+
+# ── Ensure database ─────────────────────────────────────────────────────────
 
 ensure_database() {
   info "Ensuring MariaDB dev container is running..."
   bash "$SCRIPT_DIR/ensure-docker-db.sh"
 }
 
-generate_env_files() {
-  local config_name="$1"
-
-  info "Generating .env files from Doppler..."
-
-  # Fetch all secrets
-  local secrets
-  secrets=$(doppler secrets --project "$DOPPLER_PROJECT" --config "$config_name" --json 2>/dev/null)
-
-  # Generate API .env
-  echo "$secrets" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-skip = {'DOPPLER_CONFIG', 'DOPPLER_ENVIRONMENT', 'DOPPLER_PROJECT'}
-with open('$REPO_ROOT/stacker-api/.env', 'w') as f:
-    f.write('# Auto-generated by init-env.sh — do not edit manually.\n')
-    f.write('# Update shared values in Doppler, personal values via: yarn init-env\n\n')
-    for k, v in sorted(d.items()):
-        if k in skip:
-            continue
-        val = v.get('computed', '')
-        if k.startswith('API_'):
-            env_key = k[4:]  # Strip API_ prefix
-            f.write(f'{env_key}=\"{val}\"\n')
-"
-
-  # Generate UI .env
-  echo "$secrets" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-skip = {'DOPPLER_CONFIG', 'DOPPLER_ENVIRONMENT', 'DOPPLER_PROJECT'}
-with open('$REPO_ROOT/stacker-ui/.env', 'w') as f:
-    f.write('# Auto-generated by init-env.sh — do not edit manually.\n')
-    f.write('# Update shared values in Doppler, personal values via: yarn init-env\n\n')
-    for k, v in sorted(d.items()):
-        if k in skip:
-            continue
-        val = v.get('computed', '')
-        if k.startswith('UI_'):
-            env_key = k[3:]  # Strip UI_ prefix
-            f.write(f'{env_key}=\"{val}\"\n')
-"
-
-  # Generate CLI .env
-  echo "$secrets" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-skip = {'DOPPLER_CONFIG', 'DOPPLER_ENVIRONMENT', 'DOPPLER_PROJECT'}
-with open('$REPO_ROOT/stacker-cli/.env', 'w') as f:
-    f.write('# Auto-generated by init-env.sh — do not edit manually.\n')
-    f.write('# Update shared values in Doppler, personal values via: yarn init-env\n\n')
-    for k, v in sorted(d.items()):
-        if k in skip:
-            continue
-        val = v.get('computed', '')
-        if k.startswith('CLI_'):
-            env_key = k[4:]  # Strip CLI_ prefix
-            f.write(f'{env_key}=\"{val}\"\n')
-"
-
-  # Generate root .env
-  echo "$secrets" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-skip = {'DOPPLER_CONFIG', 'DOPPLER_ENVIRONMENT', 'DOPPLER_PROJECT'}
-with open('$REPO_ROOT/.env', 'w') as f:
-    f.write('# Auto-generated by init-env.sh — do not edit manually.\n')
-    f.write('# Update shared values in Doppler, personal values via: yarn init-env\n\n')
-    for k, v in sorted(d.items()):
-        if k in skip:
-            continue
-        val = v.get('computed', '')
-        if k.startswith('ROOT_'):
-            env_key = k[5:]  # Strip ROOT_ prefix
-            f.write(f'{env_key}=\"{val}\"\n')
-"
-
-  success "Generated .env files:"
-  echo "    $REPO_ROOT/.env"
-  echo "    $REPO_ROOT/stacker-api/.env"
-  echo "    $REPO_ROOT/stacker-ui/.env"
-  echo "    $REPO_ROOT/stacker-cli/.env"
-}
-
 # ── Main ─────────────────────────────────────────────────────────────────────
-
-SYNC_ONLY="false"
-if [ "${1:-}" = "--sync" ]; then
-  SYNC_ONLY="true"
-fi
 
 echo ""
 echo -e "${CYAN}━━━ Stacker Environment Setup ━━━${NC}"
 echo ""
 
-# Step 1: Doppler
-check_doppler
-check_doppler_auth
+# Step 1: Detect Doppler
+detect_doppler
 
-# Step 2: Branch config
-USERNAME=$(get_username)
-CONFIG_NAME="${DOPPLER_BASE_CONFIG}_${USERNAME}"
-ensure_branch_config "$CONFIG_NAME"
+if [ "$USE_DOPPLER" = "true" ]; then
+  # ── Doppler path ──────────────────────────────────────────────────────────
 
-# Step 3: Developer info (skip if --sync)
-if [ "$SYNC_ONLY" = "false" ]; then
-  prompt_developer_info "$CONFIG_NAME"
+  USERNAME=$(get_username)
+  CONFIG_NAME="${DOPPLER_BASE_CONFIG}_${USERNAME}"
+  ensure_branch_config "$CONFIG_NAME"
+
+  if [ "$SYNC_ONLY" = "false" ]; then
+    # Check if personal values already exist in Doppler
+    existing_email=$(doppler secrets get API_SEED_ADMIN_EMAIL --project "$DOPPLER_PROJECT" --config "$CONFIG_NAME" --plain 2>/dev/null || echo "")
+
+    if [ -n "$existing_email" ]; then
+      echo ""
+      echo "  Current developer: $existing_email"
+      echo ""
+      read -r -p "  Reconfigure? (y/N): " reconfigure
+      if [[ "$reconfigure" =~ ^[Yy]$ ]]; then
+        if prompt_developer_info; then
+          doppler_provision "$CONFIG_NAME"
+        fi
+      else
+        success "Keeping existing configuration"
+      fi
+    else
+      if prompt_developer_info; then
+        doppler_provision "$CONFIG_NAME"
+      fi
+    fi
+  fi
+
+  doppler_generate_env_files "$CONFIG_NAME"
+
+else
+  # ── Local path ────────────────────────────────────────────────────────────
+
+  if [ "$SYNC_ONLY" = "true" ]; then
+    # In local mode, --sync just verifies .env files exist
+    if [ -f "$REPO_ROOT/stacker-api/.env" ]; then
+      success ".env files already exist (local mode, nothing to sync)"
+    else
+      warn "No .env files found. Run 'yarn init-env' without --sync."
+      exit 1
+    fi
+  else
+    if prompt_developer_info; then
+      local_generate_env_files
+    else
+      # User chose not to reconfigure — leave existing files alone
+      success "Keeping existing .env files"
+    fi
+  fi
 fi
-
-# Step 4: Generate .env files
-generate_env_files "$CONFIG_NAME"
 
 # Step 5: Ensure database container
 ensure_database

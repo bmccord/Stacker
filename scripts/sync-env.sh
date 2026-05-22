@@ -26,16 +26,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Check if Doppler is available and authenticated
+# Check if Doppler is available and authenticated — skip silently if not.
+# Local-mode developers manage .env files directly; no sync needed.
 if ! command -v doppler &> /dev/null; then
-  echo -e "${YELLOW}⚠${NC} Doppler CLI not installed. Skipping .env sync."
-  echo "  Run 'yarn init-env' to set up your environment."
   exit 0
 fi
 
 if ! doppler me &> /dev/null; then
-  echo -e "${YELLOW}⚠${NC} Doppler not authenticated. Skipping .env sync."
-  echo "  Run 'yarn init-env' to set up your environment."
   exit 0
 fi
 
