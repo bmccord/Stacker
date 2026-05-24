@@ -1,11 +1,11 @@
 services:
   api:
-    image: ghcr.io/${GITHUB_REPOSITORY}/stacker-api:${API_IMAGE_TAG:-latest}
+    image: ghcr.io/bmccord/stacker/stacker-api:${API_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
-      - "${API_PORT:-4000}:4000"
+      - "${API_PORT:-4100}:4000"
     environment:
-      DATABASE_URL: mysql://root:${DB_ROOT_PASSWORD}@${DB_HOST:-db}:3306/${DB_NAME:-stacker}
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       STACKER_API_KEY: ${STACKER_API_KEY}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL}
@@ -16,15 +16,15 @@ services:
       PORT: "4000"
 
   ui:
-    image: ghcr.io/${GITHUB_REPOSITORY}/stacker-ui:${UI_IMAGE_TAG:-latest}
+    image: ghcr.io/bmccord/stacker/stacker-ui:${UI_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
-      - "${UI_PORT:-80}:80"
+      - "${UI_PORT:-3100}:80"
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/graphql}
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:4100/graphql}
 
   docs:
-    image: ghcr.io/${GITHUB_REPOSITORY}/stacker-docs:${DOCS_IMAGE_TAG:-latest}
+    image: ghcr.io/bmccord/stacker/stacker-docs:${DOCS_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
-      - "${DOCS_PORT:-3001}:80"
+      - "${DOCS_PORT:-3101}:80"
