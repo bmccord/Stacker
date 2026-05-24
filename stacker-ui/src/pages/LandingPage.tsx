@@ -103,9 +103,9 @@ export default function LandingPage() {
             <div>git clone https://github.com/bmccord/Stacker.git</div>
             <div>cd Stacker && cd stacker-api && yarn install && cd ../stacker-ui && yarn install && cd ..</div>
             <div>yarn init-env</div>
-            <div className="mt-4 text-gray-400"># Start developing</div>
+            <div className="mt-4 text-gray-400"># Start developing (two terminals)</div>
             <div>cd stacker-api && yarn dev    <span className="text-gray-400"># API on :4000</span></div>
-            <div>cd stacker-ui && yarn dev     <span className="text-gray-400"># UI on :5173</span></div>
+            <div>cd ../stacker-ui && yarn dev  <span className="text-gray-400"># UI on :5173</span></div>
           </div>
         </div>
       </section>
