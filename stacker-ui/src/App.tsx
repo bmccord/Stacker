@@ -6,6 +6,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import ProtectedRoute from '@/components/layout/ProtectedRoute';
 import RequirePermission from '@/components/layout/RequirePermission';
 import SignInPage from '@/pages/SignInPage';
+import LandingPage from '@/pages/LandingPage';
 
 const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'));
@@ -25,7 +26,7 @@ export default function App() {
       <Routes>
         {/* Public routes */}
         <Route element={<PublicLayout />}>
-          <Route path="/" element={<Navigate to="/sign-in" replace />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
