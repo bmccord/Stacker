@@ -137,7 +137,7 @@ jobs:
 
       - name: Build and push
         run: |
-          IMAGE=${{ env.REGISTRY }}/${{ github.repository }}/stacker-api
+          IMAGE=${{ env.REGISTRY }}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/stacker-api
           VERSION=${{ needs.version.outputs.api_version }}
           docker build -t $IMAGE:$VERSION -t $IMAGE:latest stacker-api/
           docker push $IMAGE:$VERSION
@@ -157,7 +157,7 @@ jobs:
 
       - name: Build and push
         run: |
-          IMAGE=${{ env.REGISTRY }}/${{ github.repository }}/stacker-ui
+          IMAGE=${{ env.REGISTRY }}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/stacker-ui
           VERSION=${{ needs.version.outputs.ui_version }}
           docker build -t $IMAGE:$VERSION -t $IMAGE:latest stacker-ui/
           docker push $IMAGE:$VERSION
@@ -177,7 +177,7 @@ jobs:
 
       - name: Build and push
         run: |
-          IMAGE=${{ env.REGISTRY }}/${{ github.repository }}/stacker-docs
+          IMAGE=${{ env.REGISTRY }}/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/stacker-docs
           VERSION=${{ needs.version.outputs.docs_version }}
           docker build -t $IMAGE:$VERSION -t $IMAGE:latest stacker-docs/
           docker push $IMAGE:$VERSION
