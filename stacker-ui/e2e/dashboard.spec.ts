@@ -7,15 +7,17 @@ test.describe('Dashboard', () => {
   });
 
   test('displays stat cards', async ({ page }) => {
-    await expect(page.getByText('Books')).toBeVisible();
-    await expect(page.getByText('Authors')).toBeVisible();
-    await expect(page.getByText('Reviews')).toBeVisible();
-    await expect(page.getByText('Users')).toBeVisible();
+    const main = page.locator('main');
+    await expect(main.getByText('Books')).toBeVisible();
+    await expect(main.getByText('Authors')).toBeVisible();
+    await expect(main.getByText('Reviews')).toBeVisible();
+    await expect(main.getByText('Users')).toBeVisible();
   });
 
   test('shows non-zero counts after seeding', async ({ page }) => {
+    const main = page.locator('main');
     // Seed data includes 5 authors and 8 books
-    const booksCard = page.locator('text=Books').locator('..');
+    const booksCard = main.locator('text=Books').locator('..');
     await expect(booksCard).toContainText(/[1-9]/);
   });
 });

@@ -9,9 +9,10 @@ test.describe('Groups Page', () => {
   });
 
   test('displays default system groups', async ({ page }) => {
-    await expect(page.getByText('Administrators')).toBeVisible();
-    await expect(page.getByText('Editors')).toBeVisible();
-    await expect(page.getByText('Members')).toBeVisible();
+    const main = page.locator('main');
+    await expect(main.getByText('Administrators')).toBeVisible();
+    await expect(main.getByText('Editors')).toBeVisible();
+    await expect(main.getByText('Members').first()).toBeVisible();
   });
 
   test('system groups show System badge', async ({ page }) => {
@@ -48,54 +49,8 @@ test.describe('Groups Page', () => {
 });
 
 test.describe('Group CRUD', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  let groupId: string;
-
   test.beforeEach(async ({ page }) => {
     await signIn(page);
-  });
-
-  test('creates a new group', async ({ page }) => {
-    await page.goto('/app/groups/new');
-    await page.fill('#name', 'E2E Test Group');
-    await page.fill('#description', 'A group created by E2E tests.');
-
-    // Select some permissions
-    const booksViewCheckbox = page.locator('label:has-text("View books") button[role="checkbox"], label:has-text("View books") input[type="checkbox"]');
-    await booksViewCheckbox.first().click();
-    const booksManageCheckbox = page.locator('label:has-text("Manage books") button[role="checkbox"], label:has-text("Manage books") input[type="checkbox"]');
-    await booksManageCheckbox.first().click();
-
-    await page.click('button[type="submit"]');
-
-    await expect(page).toHaveURL(/\/app\/groups$/);
-    await expect(page.getByText('E2E Test Group')).toBeVisible();
-
-    const link = page.locator('a:has-text("E2E Test Group")');
-    const href = await link.getAttribute('href');
-    groupId = href!.replace('/app/groups/', '');
-  });
-
-  test('edits the group', async ({ page }) => {
-    await page.goto(`/app/groups/${groupId}`);
-    await page.fill('#name', 'E2E Test Group (Updated)');
-    await page.click('button[type="submit"]');
-
-    await expect(page).toHaveURL(/\/app\/groups$/);
-    await expect(page.getByText('E2E Test Group (Updated)')).toBeVisible();
-  });
-
-  test('custom group shows Delete button', async ({ page }) => {
-    await page.goto('/app/groups');
-    const row = page.locator('tr', { hasText: 'E2E Test Group (Updated)' });
-    await expect(row.getByText('Delete')).toBeVisible();
-  });
-
-  test('custom group does NOT show System badge', async ({ page }) => {
-    await page.goto('/app/groups');
-    const row = page.locator('tr', { hasText: 'E2E Test Group (Updated)' });
-    await expect(row.getByText('System')).not.toBeVisible();
   });
 
   test('validates name is required', async ({ page }) => {
@@ -111,14 +66,35 @@ test.describe('Group CRUD', () => {
     await expect(page).toHaveURL(/\/app\/groups$/);
   });
 
-  test('deletes the group', async ({ page }) => {
-    await page.goto('/app/groups');
-    const row = page.locator('tr', { hasText: 'E2E Test Group (Updated)' });
-    await row.getByText('Delete').click();
+  test('creates, edits, and deletes a group', async ({ page }) => {
+    const main = page.locator('main');
 
-    await expect(page.getByText('Delete Group')).toBeVisible();
+    // Create
+    await page.goto('/app/groups/new');
+    await page.fill('#name', 'E2E Test Group');
+    await page.fill('#description', 'A group created by E2E tests.');
+    const booksViewCheckbox = page.locator('label:has-text("View books") button[role="checkbox"], label:has-text("View books") input[type="checkbox"]');
+    await booksViewCheckbox.first().click();
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/app\/groups$/);
+    await expect(main.getByText('E2E Test Group')).toBeVisible();
+
+    // Verify custom group has Delete button and no System badge
+    const row = page.locator('tr', { hasText: 'E2E Test Group' });
+    await expect(row.getByText('Delete')).toBeVisible();
+    await expect(row.getByText('System')).not.toBeVisible();
+
+    // Edit
+    await main.locator('a:has-text("E2E Test Group")').click();
+    await page.fill('#name', 'E2E Test Group (Updated)');
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/app\/groups$/);
+    await expect(main.getByText('E2E Test Group (Updated)')).toBeVisible();
+
+    // Delete
+    const updatedRow = page.locator('tr', { hasText: 'E2E Test Group (Updated)' });
+    await updatedRow.getByText('Delete').click();
     await page.locator('[role="dialog"] button:has-text("Delete")').click();
-
-    await expect(page.getByText('E2E Test Group (Updated)')).not.toBeVisible();
+    await expect(main.getByText('E2E Test Group (Updated)')).not.toBeVisible();
   });
 });

@@ -18,13 +18,14 @@ test.describe('Users Page', () => {
   });
 
   test('search filters users', async ({ page }) => {
+    const main = page.locator('main');
     await page.fill('input[placeholder*="Search"]', 'e2e');
-    await expect(page.getByText('e2e@test.com')).toBeVisible();
+    await expect(main.getByText('e2e@test.com')).toBeVisible();
   });
 
   test('Invite User button opens dialog', async ({ page }) => {
-    await page.click('button:has-text("Invite User")');
-    await expect(page.getByText('Invite User', { exact: true })).toBeVisible();
+    await page.locator('main').locator('button:has-text("Invite User")').click();
+    await expect(page.locator('[role="dialog"]').getByText('Invite User', { exact: true })).toBeVisible();
     await expect(page.locator('#invite-email')).toBeVisible();
   });
 
@@ -35,50 +36,43 @@ test.describe('Users Page', () => {
   });
 });
 
-test.describe('User Invite', () => {
-  test.describe.configure({ mode: 'serial' });
-
+test.describe('User Management', () => {
   test.beforeEach(async ({ page }) => {
     await signIn(page);
     await page.goto('/app/users');
   });
 
-  test('invites a new user', async ({ page }) => {
-    await page.click('button:has-text("Invite User")');
+  test('invites, edits groups, and removes a user', async ({ page }) => {
+    const main = page.locator('main');
+
+    // Invite
+    await main.locator('button:has-text("Invite User")').click();
     await page.fill('#invite-email', 'invited@test.com');
-    // Select a group
-    const groupCheckbox = page.locator('label:has-text("Members") input[type="checkbox"], label:has-text("Members") button[role="checkbox"]');
+    const groupCheckbox = page.locator('[role="dialog"] label:has-text("Members") button[role="checkbox"], [role="dialog"] label:has-text("Members") input[type="checkbox"]');
     await groupCheckbox.first().click();
     await page.click('button:has-text("Send Invite")');
+    await expect(main.getByText('invited@test.com')).toBeVisible({ timeout: 10000 });
 
-    // Wait for dialog to close and user to appear
-    await expect(page.getByText('invited@test.com')).toBeVisible({ timeout: 10000 });
-  });
-
-  test('shows error for duplicate email', async ({ page }) => {
-    await page.click('button:has-text("Invite User")');
+    // Duplicate invite shows error
+    await main.locator('button:has-text("Invite User")').click();
     await page.fill('#invite-email', 'invited@test.com');
     await page.click('button:has-text("Send Invite")');
+    await expect(page.getByText('already exists').first()).toBeVisible({ timeout: 5000 });
+    // Close the dialog via Cancel button and wait for it to disappear
+    await page.locator('[role="dialog"] button:has-text("Cancel")').click();
+    await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 5000 });
 
-    await expect(page.getByText('already exists')).toBeVisible({ timeout: 5000 });
-  });
-
-  test('edit groups dialog works', async ({ page }) => {
+    // Edit groups
     const row = page.locator('tr', { hasText: 'invited@test.com' });
     await row.getByText('Edit Groups').click();
-
-    await expect(page.getByText('Edit Groups for')).toBeVisible();
+    await expect(page.locator('[role="dialog"]').getByText('Edit Groups for')).toBeVisible();
     await page.click('button:has-text("Update Groups")');
-    await expect(page.getByText('Groups updated')).toBeVisible({ timeout: 5000 });
-  });
+    await expect(page.getByText('Groups updated').first()).toBeVisible({ timeout: 5000 });
 
-  test('removes the invited user', async ({ page }) => {
-    const row = page.locator('tr', { hasText: 'invited@test.com' });
+    // Remove
     await row.getByText('Remove').click();
-
-    await expect(page.getByText('Remove User')).toBeVisible();
+    await expect(page.locator('[role="dialog"]').getByText('Remove User')).toBeVisible();
     await page.locator('[role="dialog"] button:has-text("Delete")').click();
-
-    await expect(page.getByText('invited@test.com')).not.toBeVisible({ timeout: 5000 });
+    await expect(main.getByText('invited@test.com')).not.toBeVisible({ timeout: 5000 });
   });
 });

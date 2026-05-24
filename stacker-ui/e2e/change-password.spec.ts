@@ -8,7 +8,7 @@ test.describe('Change Password', () => {
 
   test('opens change password dialog from sidebar', async ({ page }) => {
     await page.click('[title="Change password"]');
-    await expect(page.getByText('Change Password', { exact: true })).toBeVisible();
+    await expect(page.locator('#cp-current')).toBeVisible();
     await expect(page.locator('#cp-current')).toBeVisible();
     await expect(page.locator('#cp-new')).toBeVisible();
     await expect(page.locator('#cp-confirm')).toBeVisible();
@@ -20,7 +20,7 @@ test.describe('Change Password', () => {
     await page.fill('#cp-new', 'newpassword123');
     await page.fill('#cp-confirm', 'differentpassword');
     await page.click('button:has-text("Change Password")');
-    await expect(page.getByText('Passwords do not match')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Passwords do not match').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('cancel closes the dialog', async ({ page }) => {

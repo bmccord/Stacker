@@ -11,7 +11,7 @@ test.describe('Authentication', () => {
     await signInViaForm(page);
     await expect(page).toHaveURL(/\/app/);
     // Sidebar should be visible
-    await expect(page.locator('nav')).toBeVisible();
+    await expect(page.locator('nav').first()).toBeVisible();
   });
 
   test('shows error for invalid credentials', async ({ page }) => {
