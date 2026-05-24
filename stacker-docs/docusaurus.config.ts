@@ -5,10 +5,10 @@ const config: Config = {
   title: 'Stacker Docs',
   tagline: 'Developer documentation for the Stacker starter kit',
   favicon: 'img/favicon.ico',
-  url: 'https://docs.example.com',
-  baseUrl: '/',
-  organizationName: 'your-org',
-  projectName: 'stacker',
+  url: 'https://bmccord.github.io',
+  baseUrl: '/Stacker/',
+  organizationName: 'bmccord',
+  projectName: 'Stacker',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   i18n: { defaultLocale: 'en', locales: ['en'] },
@@ -24,7 +24,7 @@ const config: Config = {
       title: 'Stacker Docs',
       items: [
         { type: 'docSidebar', sidebarId: 'docs', position: 'left', label: 'Docs' },
-        { href: 'https://github.com/your-org/stacker', label: 'GitHub', position: 'right' },
+        { href: 'https://github.com/bmccord/Stacker', label: 'GitHub', position: 'right' },
       ],
     },
     footer: {

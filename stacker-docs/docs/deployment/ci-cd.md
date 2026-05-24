@@ -4,36 +4,64 @@ sidebar_position: 2
 
 # CI/CD
 
-Stacker uses GitHub Actions for continuous integration and deployment.
+Stacker uses GitHub Actions for continuous integration and deployment, with four workflow files.
 
-## Pipeline Overview
+## Workflows
 
-| Trigger | Action |
-|---------|--------|
-| PR to main | Build and test changed projects |
-| Push to main | Build, deploy through dev, test, and prod |
+### CI (`ci.yml`)
 
-## Deployment Tiers
+**Trigger:** Pull requests to main, manual dispatch
 
-1. **Dev** — Automatic deployment on push to main
-2. **Test** — Deployed after dev succeeds, used for QA
-3. **Prod** — Requires manual approval before deployment
+1. **Detect Changes** -- `git diff` determines which projects changed (API, UI, CLI, Docs)
+2. **Build jobs** -- only run for changed projects:
+   - **API:** Install, generate Prisma client, run unit tests, build TypeScript
+   - **UI:** Install, build (tsc + vite)
+   - **CLI:** Install, build
+   - **Docs:** Install, build (Docusaurus)
+3. **Disk space check** -- each job checks available disk space and clears caches if below 1GB (for self-hosted runners)
+4. **Test summary** -- API test results are written to the GitHub Actions step summary
+
+### Deploy (`deploy.yml`)
+
+**Trigger:** Push to main, manual dispatch
+
+1. **Detect Changes** -- same as CI
+2. **Compute Versions** -- calculates semantic versions per service from git tags
+3. **Build Images** -- Docker build and push to GHCR for changed services
+4. **Deploy** -- sequential deployment through dev -> test -> prod via SSH
+
+Each deploy step SCPs the compose file, writes a `.env` with secrets, pulls images, and runs `docker compose up -d`.
+
+### Reset Database (`reset-db.yml`)
+
+**Trigger:** Manual dispatch only
+
+Resets the database in any environment. Drops and recreates the database via the API container, then restarts it (which auto-runs migrations and seed). Production requires typing "RESET PRODUCTION" as a safety gate.
+
+### Seed Sync (`seed-sync.yml`)
+
+**Trigger:** Manual dispatch only
+
+Pushes seed data to any environment. SCPs the `prisma/seed-data/` directory to the server, copies it into the API container, and runs `yarn prisma db seed`. Same production safety gate.
 
 ## Selective Builds
 
-Only changed projects are built and deployed. The pipeline detects which projects have changes and skips unchanged services, keeping deployments fast and focused.
+The CI and Deploy workflows use a shared `changes` job to detect which projects were modified. Only changed projects are built, tested, and deployed. Unchanged services are completely skipped.
 
-## Versioning
+## Deployment Architecture
 
-Each service is versioned independently using git tags:
+- **Method:** SSH + docker compose
+- **Registry:** GitHub Container Registry (GHCR)
+- **Environments:** dev, test, production (GitHub Environments with separate secrets)
+- **Deploy vars:** `DEPLOY_USER`, `DEPLOY_HOST`, `DEPLOY_PATH` (per environment)
 
-- `api/v1.2.0`
-- `ui/v1.3.0`
-- `cli/v1.0.0`
-- `docs/v1.1.0`
+## Branch Protection
 
-Use `[major:api]` or `[breaking:ui]` in a commit message to bump the major version for a specific service.
+The `main` branch is protected with a repository ruleset:
 
-## Container Registry
-
-Docker images are pushed to GitHub Container Registry (GHCR) and deployed via SSH to standalone servers.
+- Pull request required (1 approval)
+- Stale reviews dismissed on push
+- Review thread resolution required
+- "Detect Changes" status check must pass
+- Branch must be up to date with main
+- Repository admins can bypass
