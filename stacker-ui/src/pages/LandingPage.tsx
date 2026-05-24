@@ -105,7 +105,7 @@ export default function LandingPage() {
             <div>yarn init-env</div>
             <div className="mt-4 text-gray-400"># Start developing (two terminals)</div>
             <div>cd stacker-api && yarn dev    <span className="text-gray-400"># API on :4000</span></div>
-            <div>cd ../stacker-ui && yarn dev  <span className="text-gray-400"># UI on :5173</span></div>
+            <div>cd stacker-ui && yarn dev     <span className="text-gray-400"># UI on :5173</span></div>
           </div>
         </div>
       </section>
