@@ -76,6 +76,7 @@ jobs:
     outputs:
       api_version: ${{ steps.ver.outputs.api_version }}
       ui_version: ${{ steps.ver.outputs.ui_version }}
+      docs_version: ${{ steps.ver.outputs.docs_version }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -112,6 +113,12 @@ jobs:
             UI_VER=$(compute_version "ui" "${{ inputs.major_ui }}")
             echo "ui_version=${UI_VER#ui/v}" >> "$GITHUB_OUTPUT"
             git tag "$UI_VER"
+          fi
+
+          if [ "${{ needs.changes.outputs.docs }}" = "true" ]; then
+            DOCS_VER=$(compute_version "docs" "false")
+            echo "docs_version=${DOCS_VER#docs/v}" >> "$GITHUB_OUTPUT"
+            git tag "$DOCS_VER"
           fi
 
           git push --tags || true
@@ -156,56 +163,128 @@ jobs:
           docker push $IMAGE:$VERSION
           docker push $IMAGE:latest
 
+  # ── Build Docs ───────────────────────────────────────────────────────
+  build-docs:
+    name: Build Docs Image
+    needs: [changes, version]
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ github.repository }}/stacker-docs
+          VERSION=${{ needs.version.outputs.docs_version }}
+          docker build -t $IMAGE:$VERSION -t $IMAGE:latest stacker-docs/
+          docker push $IMAGE:$VERSION
+          docker push $IMAGE:latest
+
   # ── Deploy Dev ───────────────────────────────────────────────────────
   deploy-dev:
     name: Deploy to Dev
-    needs: [changes, version, build-api, build-ui]
-    if: always() && !inputs.skip_dev && (needs.build-api.result == 'success' || needs.build-api.result == 'skipped') && (needs.build-ui.result == 'success' || needs.build-ui.result == 'skipped')
+    needs: [changes, version, build-api, build-ui, build-docs]
+    if: always() && !inputs.skip_dev && (needs.build-api.result == 'success' || needs.build-api.result == 'skipped') && (needs.build-ui.result == 'success' || needs.build-ui.result == 'skipped') && (needs.build-docs.result == 'success' || needs.build-docs.result == 'skipped')
     runs-on: self-hosted
     environment: dev
     steps:
       - uses: actions/checkout@v6
 
-      - name: Deploy via SSH
+      - name: Deploy
         run: |
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'DEPLOY'
-            cd ${{ vars.DEPLOY_PATH }}
-            docker compose pull
-            docker compose up -d --remove-orphans
-          DEPLOY
+          HOST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          PATH="${{ vars.DEPLOY_PATH }}"
+
+          # Ensure deploy directory exists
+          ssh $HOST "mkdir -p $PATH"
+
+          # Copy compose file
+          scp .github/deploy/docker-compose.yml $HOST:$PATH/docker-compose.yml
+
+          # Write .env
+          ssh $HOST "cat > $PATH/.env" << ENVEOF
+          API_IMAGE_TAG=${{ needs.version.outputs.api_version || 'latest' }}
+          UI_IMAGE_TAG=${{ needs.version.outputs.ui_version || 'latest' }}
+          DOCS_IMAGE_TAG=${{ needs.version.outputs.docs_version || 'latest' }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          STACKER_API_KEY=${{ secrets.STACKER_API_KEY }}
+          SEED_ADMIN_EMAIL=${{ secrets.SEED_ADMIN_EMAIL }}
+          SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}
+          VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
+          ENVEOF
+
+          # Pull and start
+          ssh $HOST "cd $PATH && docker compose pull && docker compose up -d --remove-orphans"
+
+          # Prune old images
+          ssh $HOST "docker image prune -a --filter 'until=168h' -f" || true
 
   # ── Deploy Test ──────────────────────────────────────────────────────
   deploy-test:
     name: Deploy to Test
-    needs: [deploy-dev]
+    needs: [changes, version, deploy-dev]
     if: always() && !inputs.skip_test && needs.deploy-dev.result == 'success'
     runs-on: self-hosted
     environment: test
     steps:
       - uses: actions/checkout@v6
 
-      - name: Deploy via SSH
+      - name: Deploy
         run: |
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'DEPLOY'
-            cd ${{ vars.DEPLOY_PATH }}
-            docker compose pull
-            docker compose up -d --remove-orphans
-          DEPLOY
+          HOST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          PATH="${{ vars.DEPLOY_PATH }}"
+
+          ssh $HOST "mkdir -p $PATH"
+          scp .github/deploy/docker-compose.yml $HOST:$PATH/docker-compose.yml
+
+          ssh $HOST "cat > $PATH/.env" << ENVEOF
+          API_IMAGE_TAG=${{ needs.version.outputs.api_version || 'latest' }}
+          UI_IMAGE_TAG=${{ needs.version.outputs.ui_version || 'latest' }}
+          DOCS_IMAGE_TAG=${{ needs.version.outputs.docs_version || 'latest' }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          STACKER_API_KEY=${{ secrets.STACKER_API_KEY }}
+          SEED_ADMIN_EMAIL=${{ secrets.SEED_ADMIN_EMAIL }}
+          SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}
+          VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
+          ENVEOF
+
+          ssh $HOST "cd $PATH && docker compose pull && docker compose up -d --remove-orphans"
+          ssh $HOST "docker image prune -a --filter 'until=168h' -f" || true
 
   # ── Deploy Prod ──────────────────────────────────────────────────────
   deploy-prod:
     name: Deploy to Prod
-    needs: [deploy-test]
+    needs: [changes, version, deploy-test]
     if: always() && !inputs.skip_prod && needs.deploy-test.result == 'success'
     runs-on: self-hosted
     environment: production
     steps:
       - uses: actions/checkout@v6
 
-      - name: Deploy via SSH
+      - name: Deploy
         run: |
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'DEPLOY'
-            cd ${{ vars.DEPLOY_PATH }}
-            docker compose pull
-            docker compose up -d --remove-orphans
-          DEPLOY
+          HOST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          PATH="${{ vars.DEPLOY_PATH }}"
+
+          ssh $HOST "mkdir -p $PATH"
+          scp .github/deploy/docker-compose.yml $HOST:$PATH/docker-compose.yml
+
+          ssh $HOST "cat > $PATH/.env" << ENVEOF
+          API_IMAGE_TAG=${{ needs.version.outputs.api_version || 'latest' }}
+          UI_IMAGE_TAG=${{ needs.version.outputs.ui_version || 'latest' }}
+          DOCS_IMAGE_TAG=${{ needs.version.outputs.docs_version || 'latest' }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          STACKER_API_KEY=${{ secrets.STACKER_API_KEY }}
+          SEED_ADMIN_EMAIL=${{ secrets.SEED_ADMIN_EMAIL }}
+          SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}
+          VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
+          ENVEOF
+
+          ssh $HOST "cd $PATH && docker compose pull && docker compose up -d --remove-orphans"
+          ssh $HOST "docker image prune -a --filter 'until=168h' -f" || true
