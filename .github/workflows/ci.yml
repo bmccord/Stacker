@@ -66,9 +66,13 @@ jobs:
         run: |
           FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
           echo "Free disk space: ${FREE}GB"
-          if [ "$FREE" -lt 1 ]; then
-            echo "Low disk — clearing caches"
+          if [ "$FREE" -lt 5 ]; then
+            echo "Low disk — clearing caches and Docker artifacts"
             rm -rf ~/.yarn/berry/cache node_modules
+            docker system prune -af --filter 'until=24h' || true
+            docker builder prune -af || true
+            FREE_AFTER=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
+            echo "Free disk space after cleanup: ${FREE_AFTER}GB"
           fi
         working-directory: .
 
@@ -95,7 +99,7 @@ jobs:
         run: |
           echo "## API Test Results" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          tail -5 test-unit.log >> "$GITHUB_STEP_SUMMARY"
+          tail -5 test-unit.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "No test output" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - run: yarn run build
@@ -118,9 +122,13 @@ jobs:
         run: |
           FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
           echo "Free disk space: ${FREE}GB"
-          if [ "$FREE" -lt 1 ]; then
-            echo "Low disk — clearing caches"
+          if [ "$FREE" -lt 5 ]; then
+            echo "Low disk — clearing caches and Docker artifacts"
             rm -rf ~/.yarn/berry/cache node_modules
+            docker system prune -af --filter 'until=24h' || true
+            docker builder prune -af || true
+            FREE_AFTER=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
+            echo "Free disk space after cleanup: ${FREE_AFTER}GB"
           fi
         working-directory: .
 
@@ -152,9 +160,11 @@ jobs:
         run: |
           FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
           echo "Free disk space: ${FREE}GB"
-          if [ "$FREE" -lt 1 ]; then
-            echo "Low disk — clearing caches"
+          if [ "$FREE" -lt 5 ]; then
+            echo "Low disk — clearing caches and Docker artifacts"
             rm -rf ~/.yarn/berry/cache node_modules
+            docker system prune -af --filter 'until=24h' || true
+            docker builder prune -af || true
           fi
         working-directory: .
 
@@ -183,9 +193,11 @@ jobs:
         run: |
           FREE=$(df -BG "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}' | tr -d 'G')
           echo "Free disk space: ${FREE}GB"
-          if [ "$FREE" -lt 1 ]; then
-            echo "Low disk — clearing caches"
+          if [ "$FREE" -lt 5 ]; then
+            echo "Low disk — clearing caches and Docker artifacts"
             rm -rf ~/.yarn/berry/cache node_modules
+            docker system prune -af --filter 'until=24h' || true
+            docker builder prune -af || true
           fi
         working-directory: .
 
