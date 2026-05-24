@@ -3,9 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright E2E test configuration.
  *
- * Expects the API and UI to be running:
- *   - API on port 4000
- *   - UI on port 5173 (Vite dev server)
+ * Global setup spins up a test database, API server (port 4001),
+ * and UI dev server (port 5174). Teardown cleans everything up.
  *
  * Run: yarn test:e2e
  */
@@ -17,8 +16,10 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: 'html',
+  globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5174',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
