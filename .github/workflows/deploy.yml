@@ -193,19 +193,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Deploy
         run: |
-          HOST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
-          PATH="${{ vars.DEPLOY_PATH }}"
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          SCP="scp -i ~/.ssh/deploy_key"
+          DEPLOY_DIR="${{ vars.DEPLOY_PATH }}"
 
-          # Ensure deploy directory exists
-          ssh $HOST "mkdir -p $PATH"
+          $SSH "mkdir -p $DEPLOY_DIR"
+          $SCP .github/deploy/docker-compose.yml ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:$DEPLOY_DIR/docker-compose.yml
 
-          # Copy compose file
-          scp .github/deploy/docker-compose.yml $HOST:$PATH/docker-compose.yml
-
-          # Write .env
-          ssh $HOST "cat > $PATH/.env" << ENVEOF
+          $SSH "cat > $DEPLOY_DIR/.env" << ENVEOF
           API_IMAGE_TAG=${{ needs.version.outputs.api_version || 'latest' }}
           UI_IMAGE_TAG=${{ needs.version.outputs.ui_version || 'latest' }}
           DOCS_IMAGE_TAG=${{ needs.version.outputs.docs_version || 'latest' }}
@@ -217,11 +221,12 @@ jobs:
           VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
           ENVEOF
 
-          # Pull and start
-          ssh $HOST "cd $PATH && docker compose pull && docker compose up -d --remove-orphans"
+          $SSH "cd $DEPLOY_DIR && docker compose pull && docker compose up -d --remove-orphans"
+          $SSH "docker image prune -a --filter 'until=168h' -f" || true
 
-          # Prune old images
-          ssh $HOST "docker image prune -a --filter 'until=168h' -f" || true
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   # ── Deploy Test ──────────────────────────────────────────────────────
   deploy-test:
@@ -233,15 +238,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Deploy
         run: |
-          HOST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
-          PATH="${{ vars.DEPLOY_PATH }}"
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          SCP="scp -i ~/.ssh/deploy_key"
+          DEPLOY_DIR="${{ vars.DEPLOY_PATH }}"
 
-          ssh $HOST "mkdir -p $PATH"
-          scp .github/deploy/docker-compose.yml $HOST:$PATH/docker-compose.yml
+          $SSH "mkdir -p $DEPLOY_DIR"
+          $SCP .github/deploy/docker-compose.yml ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:$DEPLOY_DIR/docker-compose.yml
 
-          ssh $HOST "cat > $PATH/.env" << ENVEOF
+          $SSH "cat > $DEPLOY_DIR/.env" << ENVEOF
           API_IMAGE_TAG=${{ needs.version.outputs.api_version || 'latest' }}
           UI_IMAGE_TAG=${{ needs.version.outputs.ui_version || 'latest' }}
           DOCS_IMAGE_TAG=${{ needs.version.outputs.docs_version || 'latest' }}
@@ -253,8 +266,12 @@ jobs:
           VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
           ENVEOF
 
-          ssh $HOST "cd $PATH && docker compose pull && docker compose up -d --remove-orphans"
-          ssh $HOST "docker image prune -a --filter 'until=168h' -f" || true
+          $SSH "cd $DEPLOY_DIR && docker compose pull && docker compose up -d --remove-orphans"
+          $SSH "docker image prune -a --filter 'until=168h' -f" || true
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   # ── Deploy Prod ──────────────────────────────────────────────────────
   deploy-prod:
@@ -266,15 +283,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Deploy
         run: |
-          HOST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
-          PATH="${{ vars.DEPLOY_PATH }}"
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          SCP="scp -i ~/.ssh/deploy_key"
+          DEPLOY_DIR="${{ vars.DEPLOY_PATH }}"
 
-          ssh $HOST "mkdir -p $PATH"
-          scp .github/deploy/docker-compose.yml $HOST:$PATH/docker-compose.yml
+          $SSH "mkdir -p $DEPLOY_DIR"
+          $SCP .github/deploy/docker-compose.yml ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:$DEPLOY_DIR/docker-compose.yml
 
-          ssh $HOST "cat > $PATH/.env" << ENVEOF
+          $SSH "cat > $DEPLOY_DIR/.env" << ENVEOF
           API_IMAGE_TAG=${{ needs.version.outputs.api_version || 'latest' }}
           UI_IMAGE_TAG=${{ needs.version.outputs.ui_version || 'latest' }}
           DOCS_IMAGE_TAG=${{ needs.version.outputs.docs_version || 'latest' }}
@@ -286,5 +311,9 @@ jobs:
           VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
           ENVEOF
 
-          ssh $HOST "cd $PATH && docker compose pull && docker compose up -d --remove-orphans"
-          ssh $HOST "docker image prune -a --filter 'until=168h' -f" || true
+          $SSH "cd $DEPLOY_DIR && docker compose pull && docker compose up -d --remove-orphans"
+          $SSH "docker image prune -a --filter 'until=168h' -f" || true
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
