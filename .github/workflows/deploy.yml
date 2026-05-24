@@ -26,6 +26,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+  packages: write
+
 concurrency:
   group: deploy-main
   cancel-in-progress: false
