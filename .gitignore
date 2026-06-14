@@ -4,3 +4,20 @@ dist/
 .env
 .env.local
 logs/
+
+# Yarn (Berry) — keep .yarnrc.yml and runConfigurations tracked, ignore cache/state
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+**/.yarn/install-state.gz
+
+# JetBrains IDEs — only run configurations are shared
+.idea/*
+!.idea/runConfigurations/
+
+# E2E local scratch
+stacker-api/.e2e-start.sh
+stacker-api/e2e-api.log
