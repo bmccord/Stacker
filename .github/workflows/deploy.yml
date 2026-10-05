@@ -270,8 +270,8 @@ jobs:
           VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
           ENVEOF
 
-          $SSH "cd $DEPLOY_DIR && docker compose pull && docker compose up -d --remove-orphans"
-          $SSH "docker image prune -a --filter 'until=168h' -f" || true
+          $SSH "cd $DEPLOY_DIR && sudo docker compose pull && sudo docker compose up -d --remove-orphans"
+          $SSH "sudo docker image prune -a --filter 'until=168h' -f" || true
 
       - name: Clean up SSH
         if: always()
@@ -315,8 +315,8 @@ jobs:
           VITE_API_URL=http://${{ vars.DEPLOY_HOST }}:4100/graphql
           ENVEOF
 
-          $SSH "cd $DEPLOY_DIR && docker compose pull && docker compose up -d --remove-orphans"
-          $SSH "docker image prune -a --filter 'until=168h' -f" || true
+          $SSH "cd $DEPLOY_DIR && sudo docker compose pull && sudo docker compose up -d --remove-orphans"
+          $SSH "sudo docker image prune -a --filter 'until=168h' -f" || true
 
       - name: Clean up SSH
         if: always()
