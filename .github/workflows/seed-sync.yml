@@ -36,14 +36,26 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Copy seed data and run seed
         run: |
-          scp -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "\
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          scp -i ~/.ssh/deploy_key -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
+          $SSH "\
             cd ${{ vars.DEPLOY_PATH }} \
-            && docker cp seed-data/. \$(docker compose ps -q api):/app/prisma/seed-data/ \
-            && docker compose exec -T api yarn prisma db seed \
+            && sudo docker cp seed-data/. \$(sudo docker compose ps -q api):/app/prisma/seed-data/ \
+            && sudo docker compose exec -T api yarn prisma db seed \
             && rm -rf seed-data"
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   sync-test:
     name: Sync Seed Data — Test
@@ -54,14 +66,26 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Copy seed data and run seed
         run: |
-          scp -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "\
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          scp -i ~/.ssh/deploy_key -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
+          $SSH "\
             cd ${{ vars.DEPLOY_PATH }} \
-            && docker cp seed-data/. \$(docker compose ps -q api):/app/prisma/seed-data/ \
-            && docker compose exec -T api yarn prisma db seed \
+            && sudo docker cp seed-data/. \$(sudo docker compose ps -q api):/app/prisma/seed-data/ \
+            && sudo docker compose exec -T api yarn prisma db seed \
             && rm -rf seed-data"
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   sync-prod:
     name: Sync Seed Data — Production
@@ -72,11 +96,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Copy seed data and run seed
         run: |
-          scp -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "\
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          scp -i ~/.ssh/deploy_key -r stacker-api/prisma/seed-data ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/seed-data
+          $SSH "\
             cd ${{ vars.DEPLOY_PATH }} \
-            && docker cp seed-data/. \$(docker compose ps -q api):/app/prisma/seed-data/ \
-            && docker compose exec -T api yarn prisma db seed \
+            && sudo docker cp seed-data/. \$(sudo docker compose ps -q api):/app/prisma/seed-data/ \
+            && sudo docker compose exec -T api yarn prisma db seed \
             && rm -rf seed-data"
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
