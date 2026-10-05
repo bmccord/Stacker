@@ -7,7 +7,7 @@
 set -e
 
 echo "Resetting database..."
-docker compose exec -T api node -e '
+sudo docker compose exec -T api node -e '
 const mariadb = require("mariadb");
 const u = new URL(process.env.DATABASE_URL);
 const opts = { host: u.hostname, port: parseInt(u.port || "3306"), user: u.username, password: u.password };
@@ -24,10 +24,10 @@ const db = u.pathname.replace(/^\//, "");
 '
 
 echo "Restarting API container..."
-docker compose restart api
+sudo docker compose restart api
 
 echo "Waiting for API to start..."
 sleep 15
 
 echo "=== API logs ==="
-docker compose logs --tail 30 api
+sudo docker compose logs --tail 30 api

@@ -36,10 +36,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Reset database
         run: |
-          scp .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          scp -i ~/.ssh/deploy_key .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
+          $SSH "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   reset-test:
     name: Reset Test Database
@@ -50,10 +62,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Reset database
         run: |
-          scp .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          scp -i ~/.ssh/deploy_key .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
+          $SSH "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
 
   reset-prod:
     name: Reset Production Database
@@ -64,7 +88,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_DEPLOY_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Reset database
         run: |
-          scp .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
-          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+          SSH="ssh -i ~/.ssh/deploy_key ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          scp -i ~/.ssh/deploy_key .github/deploy/reset-db.sh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:${{ vars.DEPLOY_PATH }}/reset-db.sh
+          $SSH "chmod +x ${{ vars.DEPLOY_PATH }}/reset-db.sh && cd ${{ vars.DEPLOY_PATH }} && ./reset-db.sh"
+
+      - name: Clean up SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
