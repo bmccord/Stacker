@@ -228,6 +228,46 @@ jobs:
           $SSH "cd $DEPLOY_DIR && sudo docker compose pull && sudo docker compose up -d --remove-orphans"
           $SSH "sudo docker image prune -a --filter 'until=168h' -f" || true
 
+      - name: Smoke test
+        run: |
+          set -e
+          SSH="ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+
+          # Checks run ON the target over the SSH channel the deploy already
+          # uses, against 127.0.0.1. The runner has no HTTP access to app ports
+          # - the CI VLAN may reach deploy targets on :22 only.
+
+          retry() {
+            for i in 1 2 3 4 5 6; do
+              if OUT=$($SSH "$1" 2>/dev/null); then return 0; fi
+              echo "Attempt $i: waiting for container..."
+              sleep 5
+            done
+            return 1
+          }
+
+          if ! retry 'curl -fsS --max-time 10 -X POST http://127.0.0.1:4100/graphql -H "Content-Type: application/json" -d "{\"query\":\"{__typename}\"}"'; then
+            echo "::error::API never answered on :4100"
+            exit 1
+          fi
+          case "$OUT" in
+            *'"__typename":"Query"'*) echo "::notice::API is serving GraphQL" ;;
+            *) echo "::error::API answered but GraphQL did not: $OUT"; exit 1 ;;
+          esac
+
+          if ! retry 'curl -fsS --max-time 10 http://127.0.0.1:3100/env-config.js'; then
+            echo "::error::UI never served env-config.js on :3100"
+            exit 1
+          fi
+          echo "Fetched env-config.js:"
+          echo "$OUT"
+          case "$OUT" in
+            *localhost*|*127.0.0.1*)
+              echo "::error::Deployed env-config.js references localhost - the UI would call developer machines instead of the deployed API"
+              exit 1 ;;
+          esac
+          echo "::notice::env-config.js looks clean"
+
       - name: Clean up SSH
         if: always()
         run: rm -f ~/.ssh/deploy_key
@@ -273,6 +313,46 @@ jobs:
           $SSH "cd $DEPLOY_DIR && sudo docker compose pull && sudo docker compose up -d --remove-orphans"
           $SSH "sudo docker image prune -a --filter 'until=168h' -f" || true
 
+      - name: Smoke test
+        run: |
+          set -e
+          SSH="ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+
+          # Checks run ON the target over the SSH channel the deploy already
+          # uses, against 127.0.0.1. The runner has no HTTP access to app ports
+          # - the CI VLAN may reach deploy targets on :22 only.
+
+          retry() {
+            for i in 1 2 3 4 5 6; do
+              if OUT=$($SSH "$1" 2>/dev/null); then return 0; fi
+              echo "Attempt $i: waiting for container..."
+              sleep 5
+            done
+            return 1
+          }
+
+          if ! retry 'curl -fsS --max-time 10 -X POST http://127.0.0.1:4100/graphql -H "Content-Type: application/json" -d "{\"query\":\"{__typename}\"}"'; then
+            echo "::error::API never answered on :4100"
+            exit 1
+          fi
+          case "$OUT" in
+            *'"__typename":"Query"'*) echo "::notice::API is serving GraphQL" ;;
+            *) echo "::error::API answered but GraphQL did not: $OUT"; exit 1 ;;
+          esac
+
+          if ! retry 'curl -fsS --max-time 10 http://127.0.0.1:3100/env-config.js'; then
+            echo "::error::UI never served env-config.js on :3100"
+            exit 1
+          fi
+          echo "Fetched env-config.js:"
+          echo "$OUT"
+          case "$OUT" in
+            *localhost*|*127.0.0.1*)
+              echo "::error::Deployed env-config.js references localhost - the UI would call developer machines instead of the deployed API"
+              exit 1 ;;
+          esac
+          echo "::notice::env-config.js looks clean"
+
       - name: Clean up SSH
         if: always()
         run: rm -f ~/.ssh/deploy_key
@@ -317,6 +397,46 @@ jobs:
 
           $SSH "cd $DEPLOY_DIR && sudo docker compose pull && sudo docker compose up -d --remove-orphans"
           $SSH "sudo docker image prune -a --filter 'until=168h' -f" || true
+
+      - name: Smoke test
+        run: |
+          set -e
+          SSH="ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+
+          # Checks run ON the target over the SSH channel the deploy already
+          # uses, against 127.0.0.1. The runner has no HTTP access to app ports
+          # - the CI VLAN may reach deploy targets on :22 only.
+
+          retry() {
+            for i in 1 2 3 4 5 6; do
+              if OUT=$($SSH "$1" 2>/dev/null); then return 0; fi
+              echo "Attempt $i: waiting for container..."
+              sleep 5
+            done
+            return 1
+          }
+
+          if ! retry 'curl -fsS --max-time 10 -X POST http://127.0.0.1:4100/graphql -H "Content-Type: application/json" -d "{\"query\":\"{__typename}\"}"'; then
+            echo "::error::API never answered on :4100"
+            exit 1
+          fi
+          case "$OUT" in
+            *'"__typename":"Query"'*) echo "::notice::API is serving GraphQL" ;;
+            *) echo "::error::API answered but GraphQL did not: $OUT"; exit 1 ;;
+          esac
+
+          if ! retry 'curl -fsS --max-time 10 http://127.0.0.1:3100/env-config.js'; then
+            echo "::error::UI never served env-config.js on :3100"
+            exit 1
+          fi
+          echo "Fetched env-config.js:"
+          echo "$OUT"
+          case "$OUT" in
+            *localhost*|*127.0.0.1*)
+              echo "::error::Deployed env-config.js references localhost - the UI would call developer machines instead of the deployed API"
+              exit 1 ;;
+          esac
+          echo "::notice::env-config.js looks clean"
 
       - name: Clean up SSH
         if: always()
