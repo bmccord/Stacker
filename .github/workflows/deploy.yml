@@ -241,7 +241,11 @@ jobs:
           # - the CI VLAN may reach deploy targets on :22 only.
 
           retry() {
-            for i in 1 2 3 4 5 6; do
+            # ~2 minutes. A cold API start runs migrations and the seed before
+            # it listens; measured at 60s on RingItOut, same boot shape here. A
+            # 6x5s window is tuned for already-running containers and fails the
+            # first genuinely cold deploy.
+            for i in $(seq 1 24); do
               if OUT=$($SSH "$1" 2>/dev/null); then return 0; fi
               echo "Attempt $i: waiting for container..."
               sleep 5
@@ -326,7 +330,11 @@ jobs:
           # - the CI VLAN may reach deploy targets on :22 only.
 
           retry() {
-            for i in 1 2 3 4 5 6; do
+            # ~2 minutes. A cold API start runs migrations and the seed before
+            # it listens; measured at 60s on RingItOut, same boot shape here. A
+            # 6x5s window is tuned for already-running containers and fails the
+            # first genuinely cold deploy.
+            for i in $(seq 1 24); do
               if OUT=$($SSH "$1" 2>/dev/null); then return 0; fi
               echo "Attempt $i: waiting for container..."
               sleep 5
@@ -411,7 +419,11 @@ jobs:
           # - the CI VLAN may reach deploy targets on :22 only.
 
           retry() {
-            for i in 1 2 3 4 5 6; do
+            # ~2 minutes. A cold API start runs migrations and the seed before
+            # it listens; measured at 60s on RingItOut, same boot shape here. A
+            # 6x5s window is tuned for already-running containers and fails the
+            # first genuinely cold deploy.
+            for i in $(seq 1 24); do
               if OUT=$($SSH "$1" 2>/dev/null); then return 0; fi
               echo "Attempt $i: waiting for container..."
               sleep 5
