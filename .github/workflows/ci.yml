@@ -17,7 +17,7 @@ concurrency:
 jobs:
   changes:
     name: Detect Changes
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       api: ${{ steps.filter.outputs.api }}
       ui: ${{ steps.filter.outputs.ui }}
@@ -52,7 +52,7 @@ jobs:
     name: Build & Test API
     needs: changes
     if: needs.changes.outputs.api == 'true'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: stacker-api
@@ -108,7 +108,7 @@ jobs:
     name: Build UI
     needs: changes
     if: needs.changes.outputs.ui == 'true'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: stacker-ui
@@ -151,7 +151,7 @@ jobs:
     name: Build CLI
     needs: changes
     if: needs.changes.outputs.cli == 'true'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: stacker-cli
@@ -184,7 +184,7 @@ jobs:
     name: Build Docs
     needs: changes
     if: needs.changes.outputs.docs == 'true'
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: stacker-docs
